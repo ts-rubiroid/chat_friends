@@ -6,38 +6,51 @@ class ApiConfig {
   // WordPress uploads directory - для аватаров и изображений
   static const String uploadsUrl = '$baseUrl/wp-content/uploads';
   
-  // API Version prefix
-  static const String apiVersion = 'chat-api/v1';
-  
+
+  // API Version prefix 
+
+
   // Full API base URL
-  static const String apiBaseUrl = '$baseUrl/wp-json/$apiVersion';
+  static const String apiBase = '$baseUrl/wp-json';
+
+  static const String authApi = '$apiBase/chat/v1';
+  static const String chatApi = '$apiBase/chat-api/v1';
+
+
   
-  // Authentication endpoints
-  static const String loginEndpoint = '$baseUrl/wp-json/chat/v1/auth/login';
-  static const String registerEndpoint = '$baseUrl/wp-json/chat/v1/auth/register';
-  static const String logoutEndpoint = '$baseUrl/wp-json/chat/v1/auth/logout';
+  // static const String chatApi = '$apiBase/chat-api/v1';
+
+
   
+  // Authentication endpoints  
+
+  static const String loginEndpoint = '$authApi/auth/login';
+  static const String registerEndpoint = '$authApi/auth/register';
+  static const String logoutEndpoint = '$authApi/auth/logout';
+
+
+
   // User endpoints
-  static const String meEndpoint = '$apiBaseUrl/me';
-  static const String usersEndpoint = '$apiBaseUrl/users';
-  static const String updateProfileEndpoint = '$apiBaseUrl/users/update';
+  static const String meEndpoint = '$chatApi/me';
+  static const String usersEndpoint = '$chatApi/users';
+  static const String updateProfileEndpoint = '$chatApi/users/update';
   
   // Chat endpoints
-  static const String chatsEndpoint = '$apiBaseUrl/chats';
-  static const String createChatEndpoint = '$apiBaseUrl/chats/create';
-  static const String chatDetailEndpoint = '$apiBaseUrl/chats'; // + /{id}
-  static const String updateChatEndpoint = '$apiBaseUrl/chats/update'; // + /{id}
-  static const String deleteChatEndpoint = '$apiBaseUrl/chats/delete'; // + /{id}
+  static const String chatsEndpoint = '$chatApi/chats';
+  static const String createChatEndpoint = '$chatApi/chats/create';
+  static const String chatDetailEndpoint = '$chatApi/chats'; // + /{id}
+  static const String updateChatEndpoint = '$chatApi/chats/update'; // + /{id}
+  static const String deleteChatEndpoint = '$chatApi/chats/delete'; // + /{id}
   
   // Message endpoints
-  static const String messagesEndpoint = '$apiBaseUrl/messages';
-  static const String sendMessageEndpoint = '$apiBaseUrl/messages/send';
-  static const String chatMessagesEndpoint = '$apiBaseUrl/messages/chat'; // + /{chatId}
-  static const String deleteMessageEndpoint = '$apiBaseUrl/messages/delete'; // + /{id}
+  static const String messagesEndpoint = '$chatApi/messages';
+  static const String sendMessageEndpoint = '$chatApi/messages/send';
+  static const String chatMessagesEndpoint = '$chatApi/messages/chat'; // + /{chatId}
+  static const String deleteMessageEndpoint = '$chatApi/messages/delete'; // + /{id}
   
   // File upload endpoints (если есть)
-  static const String uploadAvatarEndpoint = '$apiBaseUrl/upload/avatar';
-  static const String uploadChatImageEndpoint = '$apiBaseUrl/upload/chat-image';
+  static const String uploadAvatarEndpoint = '$chatApi/upload/avatar';
+  static const String uploadChatImageEndpoint = '$chatApi/upload/chat-image';
   
   // Helper methods for constructing URLs
   static String chatDetail(int chatId) => '$chatsEndpoint/$chatId';

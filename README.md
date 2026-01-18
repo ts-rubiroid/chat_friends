@@ -26,8 +26,6 @@ flutter pub get
 flutter build apk --release
 
 
-
-
 https://chat.remont-gazon.ru
 
 https://chat.remont-gazon.ru/admin/login.php
