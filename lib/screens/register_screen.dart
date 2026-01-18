@@ -41,17 +41,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       try {
+        // Подготавливаем данные в правильном формате
         final data = {
-          'last_name': _lastNameController.text.trim(),
           'first_name': _firstNameController.text.trim(),
+          'last_name': _lastNameController.text.trim(),
           'middle_name': _middleNameController.text.trim(),
-          'nickname': _nicknameController.text.trim(),
+          'nickname': _nicknameController.text.isNotEmpty 
+              ? _nicknameController.text.trim()
+              : _firstNameController.text.trim(), // если ник не указан, используем имя
         };
 
+        // Регистрируем пользователя
         await ApiService.register(
           _phoneController.text.trim(),
           _passwordController.text.trim(),
           data,
+        );
+        
+        // После успешной регистрации сразу логинимся
+        await ApiService.login(
+          _phoneController.text.trim(),
+          _passwordController.text.trim(),
         );
         
         Navigator.pushReplacement(
@@ -60,7 +70,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
       } catch (e) {
         setState(() {
-          _error = e.toString();
+          // Выводим понятное сообщение об ошибке
+          if (e.toString().contains('first_name') || e.toString().contains('firet_name')) {
+            _error = 'Поле "Имя" обязательно для заполнения';
+          } else if (e.toString().contains('phone')) {
+            _error = 'Поле "Телефон" обязательно или неверный формат';
+          } else {
+            _error = 'Ошибка регистрации: ${e.toString()}';
+          }
         });
       } finally {
         setState(() {
@@ -69,7 +86,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chat_friends/utils/api.dart';
 import 'package:chat_friends/models/user.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
+
 
 class ApiService {
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
@@ -69,26 +71,51 @@ class ApiService {
 
   // === АУТЕНТИФИКАЦИЯ ===
 
-  // Регистрация пользователя
+  // Регистрация пользователя - ИСПРАВЛЕННАЯ ВЕРСИЯ
   static Future<Map<String, dynamic>> register(
       String phone, String password, Map<String, dynamic> userData) async {
     final url = Uri.parse(ApiConfig.registerEndpoint);
     
+    // Создаем тело запроса точно как ожидает WordPress backend
     final body = {
-      'phone': phone,
-      'password': password,
-      'user_data': userData,
+      'phone': phone.trim(),
+      'password': password.trim(),
+      'first_name': (userData['first_name'] ?? '').trim(),
+      'last_name': (userData['last_name'] ?? '').trim(),
+      'nickname': (userData['nickname'] ?? '').trim(),
     };
+
+    // Добавляем middle_name только если он есть
+    final middleName = (userData['middle_name'] ?? '').trim();
+    if (middleName.isNotEmpty) {
+      body['middle_name'] = middleName;
+    }
 
     ApiConfig.logRequest('POST', url.toString(), body: body);
     
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(body),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(body),
+      );
 
-    return await _handleResponse(response);
+      final result = await _handleResponse(response);
+      
+      // WordPress возвращает токен в result['token']
+      final token = result['token'];
+      if (token != null && token is String) {
+        await saveToken(token);
+        print('[API] Токен сохранен после регистрации: ${token.substring(0, min(20, token.length))}...');
+      } else {
+        print('[API] Внимание: токен не найден в ответе регистрации');
+      }
+      
+      return result;
+    } catch (e) {
+      print('[API] Ошибка регистрации: $e');
+      rethrow;
+    }
   }
 
   // Логин
@@ -122,37 +149,95 @@ class ApiService {
 
   // === ПОЛЬЗОВАТЕЛИ ===
 
-  // Получить текущего пользователя
 
-  static Future<User> getCurrentUser() async {
-    final headers = await _getHeaders();
-    final url = Uri.parse(ApiConfig.meEndpoint); // Из chat/v1/me
+// Получить текущего пользователя - ИСПРАВЛЕННАЯ ВЕРСИЯ
+static Future<User> getCurrentUser() async {
+  final headers = await _getHeaders();
+  final url = Uri.parse(ApiConfig.meEndpoint);
 
-    ApiConfig.logRequest('GET', url.toString());
-    
+  ApiConfig.logRequest('GET', url.toString());
+  
+  try {
     final response = await http.get(url, headers: headers);
-    final result = await _handleResponse(response);
     
-    print('[DEBUG] Ответ от /me: $result');
+    print('[DEBUG] Status code: ${response.statusCode}');
     
-    return User.fromJson(result);
+    // Используем нашу функцию обработки ответа
+    final Map<String, dynamic> result = await _handleResponse(response);
+    
+    print('[DEBUG] Parsed result from /me: $result');
+    
+    // WordPress возвращает данные в формате: {success: true, user: {...}}
+    if (result.containsKey('success') && result['success'] == true) {
+      if (result.containsKey('user') && result['user'] is Map<String, dynamic>) {
+        // Данные в поле 'user'
+        print('[DEBUG] Извлекаем данные из result[\'user\']');
+        return User.fromJson(result['user'] as Map<String, dynamic>);
+      } else if (result.containsKey('data') && result['data'] is Map<String, dynamic>) {
+        // Данные в поле 'data' (альтернативный вариант)
+        print('[DEBUG] Извлекаем данные из result[\'data\']');
+        return User.fromJson(result['data'] as Map<String, dynamic>);
+      }
+    } else if (result.containsKey('id')) {
+      // Данные возвращаются напрямую
+      print('[DEBUG] Данные возвращены напрямую');
+      return User.fromJson(result);
+    }
+    
+    // Если не удалось распарсить - выбрасываем исключение
+    throw Exception('Неверный формат ответа от API: $result');
+  } catch (e) {
+    print('[ERROR] Ошибка в getCurrentUser: $e');
+    rethrow;
   }
+}
 
-  // Получить всех пользователей
+// Получить всех пользователей - ИСПРАВЛЕННАЯ ВЕРСЯ
+static Future<List<User>> getAllUsers() async {
+  final headers = await _getHeaders();
+  final url = Uri.parse(ApiConfig.usersEndpoint);
 
-  static Future<List<User>> getAllUsers() async {
-    final headers = await _getHeaders();
-    final url = Uri.parse(ApiConfig.usersEndpoint);
-
-    ApiConfig.logRequest('GET', url.toString());
-    
+  ApiConfig.logRequest('GET', url.toString());
+  
+  try {
     final response = await http.get(url, headers: headers);
-    final result = await _handleResponse(response);
     
-    // WordPress REST API может возвращать массив или объект с data
-    final List usersData = result is List ? result : (result['data'] ?? result['users'] ?? []);
-    return usersData.map((json) => User.fromJson(json)).toList();
+    // Явно указываем тип для _handleResponse
+    final Map<String, dynamic> result = await _handleResponse(response);
+    
+    print('[DEBUG] Ответ от /users: $result');
+    
+    // Обрабатываем разные форматы ответа
+    List<Map<String, dynamic>> usersList = [];
+    
+    if (result.containsKey('success') && result['success'] == true) {
+      if (result.containsKey('users') && result['users'] is List) {
+        final List<dynamic> rawList = result['users'] as List<dynamic>;
+        usersList = rawList.cast<Map<String, dynamic>>();
+      } else if (result.containsKey('data') && result['data'] is List) {
+        final List<dynamic> rawList = result['data'] as List<dynamic>;
+        usersList = rawList.cast<Map<String, dynamic>>();
+      }
+    } else if (result.containsKey('items') && result['items'] is List) {
+      final List<dynamic> rawList = result['items'] as List<dynamic>;
+      usersList = rawList.cast<Map<String, dynamic>>();
+    } else if (result is List) {
+      // Если ответ сам по себе список
+      final List<dynamic> rawList = result as List<dynamic>;
+      usersList = rawList.cast<Map<String, dynamic>>();
+    }
+    
+    print('[DEBUG] Найдено пользователей: ${usersList.length}');
+    
+    return usersList.map((json) => User.fromJson(json)).toList();
+  } catch (e) {
+    print('[ERROR] Ошибка в getAllUsers: $e');
+    rethrow;
   }
+}
+
+
+
 
   // Обновить профиль
   static Future<User> updateProfile(Map<String, dynamic> data) async {
