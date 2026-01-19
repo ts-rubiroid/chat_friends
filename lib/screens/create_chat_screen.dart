@@ -39,13 +39,22 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   }
 
   void _createChat() async {
-    if (_nameController.text.isEmpty) {
+    if (_isGroup && _nameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Введите название чата')),
       );
       return;
     }
 
+    // Проверка для личного чата
+    if (!_isGroup && _selectedUserIds.length != 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Для личного чата выберите одного пользователя')),
+      );
+      return;
+    }
+
+    // Проверка для группового чата
     if (_isGroup && _selectedUserIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Выберите хотя бы одного участника для группового чата')),
@@ -53,11 +62,14 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       return;
     }
 
+    // Отладка
+    print('[UI DEBUG] Создание чата: группа=$_isGroup, участники=$_selectedUserIds');
+
     try {
       await ApiService.createChat(
         _nameController.text,
         _isGroup,
-        userIds: _selectedUserIds.isNotEmpty ? _selectedUserIds : null,
+        participants: _selectedUserIds,
       );
       
       Navigator.pop(context, true);
@@ -67,6 +79,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       );
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -100,46 +113,46 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
               ],
             ),
             SizedBox(height: 20),
-            if (_isGroup) ...[
-              Text('Выберите участников:', style: TextStyle(fontSize: 16)),
-              SizedBox(height: 10),
-              if (_isLoading)
-                Center(child: CircularProgressIndicator())
-              else if (_error.isNotEmpty)
-                Text(_error, style: TextStyle(color: Colors.red))
-              else if (_users.isEmpty)
-                Text('Нет других пользователей', style: TextStyle(color: Colors.grey))
-              else
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _users.length,
-                    itemBuilder: (context, index) {
-                      final user = _users[index];
-                      
-                      // Формируем отображаемое имя
-                      String displayName = user.displayName;
-                      
-                      // Формируем подзаголовок с телефоном
-                      String? phoneSubtitle = user.phone;
-                      
-                      return CheckboxListTile(
-                        title: Text(displayName),
-                        subtitle: phoneSubtitle != null ? Text(phoneSubtitle) : null,
-                        value: _selectedUserIds.contains(user.id),
+            Text('Выберите участников:', style: TextStyle(fontSize: 16)),
+            SizedBox(height: 10),
+            
+            if (_isLoading)
+              Center(child: CircularProgressIndicator())
+            else if (_error.isNotEmpty)
+              Text(_error, style: TextStyle(color: Colors.red))
+            else if (_users.isEmpty)
+              Text('Нет других пользователей', style: TextStyle(color: Colors.grey))
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) {
+                    final user = _users[index];
+                    
+                    if (!_isGroup) {
+                      // Для личного чата - radio button (только один выбор)
+                      return RadioListTile<int>(
+                        value: user.id,
+                        groupValue: _selectedUserIds.isNotEmpty ? _selectedUserIds.first : null,
                         onChanged: (value) {
                           setState(() {
-                            if (value == true) {
-                              _selectedUserIds.add(user.id);
-                            } else {
-                              _selectedUserIds.remove(user.id);
-                            }
+                            _selectedUserIds = [value!]; // Только один ID
                           });
                         },
+                        title: Text(user.displayName),
                       );
-                    },
-                  ),
+                    } else {
+                      // Для группового чата - checkbox (множественный выбор)
+                      return CheckboxListTile(
+                        value: _selectedUserIds.contains(user.id),
+                        onChanged: (value) => _toggleUserSelection(user.id),
+                        title: Text(user.displayName),
+                      );
+                    }
+                  },
                 ),
-            ],
+              ),
+            
             SizedBox(height: 20),
             ElevatedButton(
               onPressed: _createChat,
@@ -153,4 +166,15 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       ),
     );
   }
+
+  void _toggleUserSelection(int userId) {
+    setState(() {
+      if (_selectedUserIds.contains(userId)) {
+        _selectedUserIds.remove(userId);
+      } else {
+        _selectedUserIds.add(userId);
+      }
+    });
+  }
+
 }

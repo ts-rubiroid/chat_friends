@@ -37,7 +37,9 @@ class ApiConfig {
   
   // Chat endpoints
   static const String chatsEndpoint = '$chatApi/chats';
+
   static const String createChatEndpoint = '$chatApi/chats/create';
+  
   static const String chatDetailEndpoint = '$chatApi/chats'; // + /{id}
   static const String updateChatEndpoint = '$chatApi/chats/update'; // + /{id}
   static const String deleteChatEndpoint = '$chatApi/chats/delete'; // + /{id}

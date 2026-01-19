@@ -287,31 +287,86 @@ static Future<List<User>> getAllUsers() async {
 
   // Создать чат
 
+
+  // Создать чат - исправленная версия для обработки "чат уже существует"
   static Future<Chat> createChat(String name, bool isGroup,
-      {List<int>? userIds}) async {
+      {List<int>? participants}) async {
     final headers = await _getHeaders();
     final url = Uri.parse(ApiConfig.createChatEndpoint);
 
-    // Временно убираем currentUser, пока не работает
-    // final currentUser = await getCurrentUser();
+    Map<String, dynamic> body;
     
-    final body = {
-      'name': name,
-      'is_group': isGroup,
-      'user_ids': userIds ?? [], // WordPress может ожидать пустой массив
-    };
+    if (isGroup) {
+      // Групповой чат
+      if (participants == null || participants.isEmpty) {
+        throw Exception('Для группового чата нужны участники');
+      }
+      
+      // Получаем ID текущего пользователя
+      final currentUser = await getCurrentUser();
+      final currentUserId = currentUser.id;
+      
+      // Добавляем текущего пользователя в участники
+      final allParticipants = <int>[currentUserId];
+      allParticipants.addAll(participants.where((id) => id != currentUserId));
+      
+      body = {
+        'name': name.trim(),
+        'is_group': 1,
+        'user_ids': allParticipants,
+      };
+    } else {
+      // Личный чат
+      if (participants == null || participants.isEmpty) {
+        throw Exception('Для личного чата нужен ID другого пользователя');
+      }
+      
+      body = {
+        'user_id': participants.first,
+      };
+    }
 
     ApiConfig.logRequest('POST', url.toString(), body: body);
     
-    final response = await http.post(
-      url,
-      headers: headers,
-      body: json.encode(body),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: json.encode(body),
+      );
 
-    final result = await _handleResponse(response);
-    print('[DEBUG] Ответ создания чата: $result');
-    return Chat.fromJson(result);
+      final result = await _handleResponse(response);
+      print('[DEBUG] Ответ создания чата: $result');
+      
+      // Обрабатываем ответ WordPress
+      if (result is Map<String, dynamic>) {
+        if (result.containsKey('success') && result['success'] == true) {
+          
+          // Вариант 1: Чат создан успешно
+          if (result.containsKey('chat') && result['chat'] is Map<String, dynamic>) {
+            return Chat.fromJson(result['chat'] as Map<String, dynamic>);
+          } 
+          // Вариант 2: Данные в поле 'data'
+          else if (result.containsKey('data') && result['data'] is Map<String, dynamic>) {
+            return Chat.fromJson(result['data'] as Map<String, dynamic>);
+          }
+          // Вариант 3: Чат уже существует (возвращает chat_id)
+          else if (result.containsKey('chat_id')) {
+            // Нужно получить данные существующего чата
+            final chatId = result['chat_id'];
+            print('[DEBUG] Чат уже существует, получаем данные чата ID: $chatId');
+            return await getChatDetail(chatId);
+          }
+        }
+      }
+      
+      // Если не нашли структурированный ответ
+      print('[WARNING] Нестандартный ответ создания чата: $result');
+      throw Exception('Не удалось создать чат. Ответ: $result');
+    } catch (e) {
+      print('[ERROR] Ошибка создания чата: $e');
+      rethrow;
+    }
   }
 
   // Обновить чат
@@ -330,6 +385,8 @@ static Future<List<User>> getAllUsers() async {
     final result = await _handleResponse(response);
     return Chat.fromJson(result);
   }
+
+
 
   // Удалить чат
   static Future<bool> deleteChat(int chatId) async {
@@ -363,17 +420,17 @@ static Future<List<User>> getAllUsers() async {
 
   // Отправить текстовое сообщение
   static Future<Message> sendTextMessage(int chatId, String text) async {
-    final headers = await _getHeaders();
-    final url = Uri.parse(ApiConfig.sendMessageEndpoint);
+    final headers = await _getHeaders(); // Берём токен
+    final url = Uri.parse(ApiConfig.sendMessageEndpoint); // https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/send
 
     final body = {
       'chat_id': chatId,
-      'text': text,
+      'text': text.trim(),
       'type': 'text',
     };
 
     ApiConfig.logRequest('POST', url.toString(), body: body);
-    
+
     final response = await http.post(
       url,
       headers: headers,
@@ -381,8 +438,12 @@ static Future<List<User>> getAllUsers() async {
     );
 
     final result = await _handleResponse(response);
+    print('[DEBUG] Ответ отправки текста: $result');
+
     return Message.fromJson(result);
   }
+
+
 
   // Отправить сообщение с файлом/изображением (мультипарт)
   static Future<Message> sendMessageWithFile(
@@ -394,7 +455,11 @@ static Future<List<User>> getAllUsers() async {
     
     try {
       var request = http.MultipartRequest('POST', url);
-      request.headers['Authorization'] = 'Bearer $token';
+
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
       
       // Основные поля
       request.fields['chat_id'] = chatId.toString();
@@ -426,6 +491,7 @@ static Future<List<User>> getAllUsers() async {
       rethrow;
     }
   }
+
 
   // Удалить сообщение
   static Future<bool> deleteMessage(int messageId) async {
