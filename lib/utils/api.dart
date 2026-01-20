@@ -1,3 +1,4 @@
+// lib/utils/api.dart
 // API Configuration for WordPress Chat Backend
 class ApiConfig {
   // Base URL - основной домен WordPress сайта
@@ -7,26 +8,22 @@ class ApiConfig {
   static const String uploadsUrl = '$baseUrl/wp-content/uploads';
   
 
-  // API Version prefix 
-
-
   // Full API base URL
   static const String apiBase = '$baseUrl/wp-json';
 
-  static const String authApi = '$apiBase/chat/v1';
+  // === ИСПРАВЛЕННЫЕ ENDPOINTS ===
+  // По документации: /wp-json/chat/v1/auth
+  static const String authApi = '$apiBase/chat/v1/auth';
+  
+  // По документации: /wp-json/chat-api/v1
   static const String chatApi = '$apiBase/chat-api/v1';
 
 
   
-  // static const String chatApi = '$apiBase/chat-api/v1';
-
-
-  
   // Authentication endpoints  
-
-  static const String loginEndpoint = '$authApi/auth/login';
-  static const String registerEndpoint = '$authApi/auth/register';
-  static const String logoutEndpoint = '$authApi/auth/logout';
+  static const String loginEndpoint = '$authApi/login';
+  static const String registerEndpoint = '$authApi/register';
+  static const String logoutEndpoint = '$authApi/logout';
 
 
 
@@ -37,34 +34,34 @@ class ApiConfig {
   
   // Chat endpoints
   static const String chatsEndpoint = '$chatApi/chats';
-
   static const String createChatEndpoint = '$chatApi/chats/create';
-  
   static const String chatDetailEndpoint = '$chatApi/chats'; // + /{id}
-  static const String updateChatEndpoint = '$chatApi/chats/update'; // + /{id}
-  static const String deleteChatEndpoint = '$chatApi/chats/delete'; // + /{id}
+  
+  // ВОССТАНОВЛЕННЫЕ ENDPOINTS ДЛЯ КОМПИЛЯЦИИ:
+  static const String updateChatEndpoint = '$chatApi/chats/update';
+  static const String deleteChatEndpoint = '$chatApi/chats/delete';
   
   // Message endpoints
   static const String messagesEndpoint = '$chatApi/messages';
   static const String sendMessageEndpoint = '$chatApi/messages/send';
-  static const String chatMessagesEndpoint = '$chatApi/messages/chat'; // + /{chatId}
-  static const String deleteMessageEndpoint = '$chatApi/messages/delete'; // + /{id}
+  static const String chatMessagesEndpoint = '$messagesEndpoint/chat'; // Для компиляции
+  static const String deleteMessageEndpoint = '$chatApi/messages/delete';
   
-  // File upload endpoints (если есть)
+  // File upload endpoints
   static const String uploadAvatarEndpoint = '$chatApi/upload/avatar';
-  static const String uploadChatImageEndpoint = '$chatApi/upload/chat-image';
   
   // Helper methods for constructing URLs
   static String chatDetail(int chatId) => '$chatsEndpoint/$chatId';
-  static String chatMessages(int chatId) => '$chatMessagesEndpoint/$chatId';
+  static String getMessagesUrl(int chatId) => '$messagesEndpoint?chat_id=$chatId&page=1&per_page=50';
   static String updateChat(int chatId) => '$updateChatEndpoint/$chatId';
   static String deleteChat(int chatId) => '$deleteChatEndpoint/$chatId';
+  static String chatMessages(int chatId) => '$chatMessagesEndpoint/$chatId';
   static String deleteMessage(int messageId) => '$deleteMessageEndpoint/$messageId';
   
   // Helper for avatar URL
   static String getAvatarUrl(String? avatarPath) {
     if (avatarPath == null || avatarPath.isEmpty) {
-      return '$uploadsUrl/default-avatar.png'; // Замените на путь к дефолтному аватару
+      return 'https://ui-avatars.com/api/?name=User&background=random';
     }
     
     // Если путь уже полный URL
@@ -74,21 +71,6 @@ class ApiConfig {
     
     // Если путь относительный
     return '$uploadsUrl/$avatarPath';
-  }
-  
-  // Helper for chat image URL
-  static String getChatImageUrl(String? imagePath) {
-    if (imagePath == null || imagePath.isEmpty) {
-      return '$uploadsUrl/default-chat-image.png'; // Замените на путь к дефолтному изображению чата
-    }
-    
-    // Если путь уже полный URL
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    // Если путь относительный
-    return '$uploadsUrl/$imagePath';
   }
   
   // Headers configuration
