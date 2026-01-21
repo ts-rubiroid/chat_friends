@@ -1,5 +1,6 @@
 // lib/utils/api.dart
-// API Configuration for WordPress Chat Backend
+// API Configuration for WordPress Chat Backend (Production Ready)
+
 class ApiConfig {
   // Base URL - основной домен WordPress сайта
   static const String baseUrl = 'https://chat.remont-gazon.ru';
@@ -7,60 +8,51 @@ class ApiConfig {
   // WordPress uploads directory - для аватаров и изображений
   static const String uploadsUrl = '$baseUrl/wp-content/uploads';
   
-
   // Full API base URL
   static const String apiBase = '$baseUrl/wp-json';
 
-  // === ИСПРАВЛЕННЫЕ ENDPOINTS ===
-  // По документации: /wp-json/chat/v1/auth
+  // === API NAMESPACES (согласно документации) ===
   static const String authApi = '$apiBase/chat/v1/auth';
-  
-  // По документации: /wp-json/chat-api/v1
   static const String chatApi = '$apiBase/chat-api/v1';
 
-
-  
-  // Authentication endpoints  
+  // === АУТЕНТИФИКАЦИЯ (authApi) ===
   static const String loginEndpoint = '$authApi/login';
   static const String registerEndpoint = '$authApi/register';
-  static const String logoutEndpoint = '$authApi/logout';
 
-
-
-  // User endpoints
+  // === ОСНОВНЫЕ ENDPOINTS (chatApi) ===
+  
+  // Пользователи
   static const String meEndpoint = '$chatApi/me';
   static const String usersEndpoint = '$chatApi/users';
   static const String updateProfileEndpoint = '$chatApi/users/update';
   
-  // Chat endpoints
+  // Чаты
   static const String chatsEndpoint = '$chatApi/chats';
   static const String createChatEndpoint = '$chatApi/chats/create';
-  static const String chatDetailEndpoint = '$chatApi/chats'; // + /{id}
+  static String chatAddMembersEndpoint(int chatId) => '$chatApi/chats/$chatId/add-members';
+  static String chatUpdateEndpoint(int chatId) => '$chatApi/chats/$chatId/update';
   
-  // ВОССТАНОВЛЕННЫЕ ENDPOINTS ДЛЯ КОМПИЛЯЦИИ:
-  static const String updateChatEndpoint = '$chatApi/chats/update';
-  static const String deleteChatEndpoint = '$chatApi/chats/delete';
-  
-  // Message endpoints
+  // Сообщения
   static const String messagesEndpoint = '$chatApi/messages';
   static const String sendMessageEndpoint = '$chatApi/messages/send';
-  static const String chatMessagesEndpoint = '$messagesEndpoint/chat'; // Для компиляции
-  static const String deleteMessageEndpoint = '$chatApi/messages/delete';
   
-  // File upload endpoints
+  // Загрузка файлов
   static const String uploadAvatarEndpoint = '$chatApi/upload/avatar';
   
-  // Helper methods for constructing URLs
-  static String chatDetail(int chatId) => '$chatsEndpoint/$chatId';
-  static String getMessagesUrl(int chatId) => '$messagesEndpoint?chat_id=$chatId&page=1&per_page=50';
-  static String updateChat(int chatId) => '$updateChatEndpoint/$chatId';
-  static String deleteChat(int chatId) => '$deleteChatEndpoint/$chatId';
-  static String chatMessages(int chatId) => '$chatMessagesEndpoint/$chatId';
-  static String deleteMessage(int messageId) => '$deleteMessageEndpoint/$messageId';
+  // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ ПОСТРОЕНИЯ URL ===
+  static String chatDetailEndpoint(int chatId) => '$chatsEndpoint/$chatId';
+  static String getMessagesUrl(int chatId, {int page = 1, int perPage = 50}) => 
+      '$messagesEndpoint?chat_id=$chatId&page=$page&per_page=$perPage';
   
-  // Helper for avatar URL
+  // Удаление (если реализовано на бэкенде)
+  static String deleteChatEndpoint(int chatId) => '$chatApi/chats/$chatId/delete';
+  static String deleteMessageEndpoint(int messageId) => '$chatApi/messages/$messageId/delete';
+  
+  // === ДОПОЛНИТЕЛЬНЫЕ УТИЛИТЫ ===
+  
+  // Полный URL для аватара
   static String getAvatarUrl(String? avatarPath) {
-    if (avatarPath == null || avatarPath.isEmpty) {
+    if (avatarPath == null || avatarPath.isEmpty || avatarPath == 'false' || avatarPath == 'null') {
       return 'https://ui-avatars.com/api/?name=User&background=random';
     }
     
@@ -72,15 +64,25 @@ class ApiConfig {
     // Если путь относительный
     return '$uploadsUrl/$avatarPath';
   }
+
+  // Полный URL для файлов сообщений (изображения, документы)
+  static String getFileUrl(String? filePath) {
+    if (filePath == null || filePath.isEmpty) return '';
+    
+    if (filePath.startsWith('http')) {
+      return filePath;
+    }
+    
+    return '$uploadsUrl/$filePath';
+  }
   
-  // Headers configuration
+  // Формирование заголовков с токеном
   static Map<String, String> getHeaders({String? token}) {
     Map<String, String> headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     
-    // Add Authorization header if token is provided
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -88,23 +90,21 @@ class ApiConfig {
     return headers;
   }
   
-  // Handle API errors
+  // Проверка успешности статуса
+  static bool isSuccess(int statusCode) => statusCode >= 200 && statusCode < 300;
+  
+  // Обработка ошибок API
   static String getErrorMessage(dynamic error) {
     if (error is Map<String, dynamic>) {
-      return error['message'] ?? 'An error occurred';
+      return error['message'] ?? error['error'] ?? 'Произошла ошибка';
     } else if (error is String) {
       return error;
     } else {
-      return 'An unexpected error occurred';
+      return 'Непредвиденная ошибка';
     }
   }
   
-  // Check if response is successful
-  static bool isSuccess(int statusCode) {
-    return statusCode >= 200 && statusCode < 300;
-  }
-  
-  // Debug helper
+  // Логирование запросов (только для дебага)
   static void logRequest(String method, String url, {dynamic body}) {
     print('[$method] $url');
     if (body != null) {

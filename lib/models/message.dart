@@ -65,4 +65,35 @@ class Message {
     if (file!.startsWith('http')) return file;
     return '${ApiConfig.uploadsUrl}/$file';
   }
+
+
+  // Добавьте этот метод в класс Message
+  factory Message.createLocal({
+    required int chatId,
+    required String text,
+    required int senderId,
+    String? image,
+    String? file,
+    String type = 'text',
+  }) {
+    return Message(
+      id: DateTime.now().millisecondsSinceEpoch,
+      chatId: chatId,
+      senderId: senderId,
+      text: text,
+      image: image,
+      file: file,
+      type: type,
+      createdAt: DateTime.now(),
+    );
+  }
+
+
+
+
+
+
+
+
+
 }

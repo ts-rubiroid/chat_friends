@@ -11,6 +11,7 @@ import 'package:chat_friends/models/message.dart';
 class ApiService {
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
   
+
   static Future<Map<String, dynamic>> _handleResponse(
       http.Response response) async {
     ApiConfig.logRequest(response.request?.method ?? 'GET', 
@@ -20,20 +21,33 @@ class ApiService {
       try {
         return json.decode(response.body);
       } catch (e) {
-        throw Exception('Ошибка парсинга JSON: $e');
+        // Не бросаем исключение, возвращаем пустой Map
+        print('[WARNING] Ошибка парсинга JSON: $e');
+        return {'success': false, 'error': 'Invalid JSON response'};
       }
     } else {
+      // Для ошибок 400-500
       try {
         final errorData = json.decode(response.body);
         final errorMessage = errorData['message'] ?? 
-                           errorData['error'] ?? 
-                           'Ошибка ${response.statusCode}';
-        throw Exception(errorMessage);
+                          errorData['error'] ?? 
+                          'Ошибка ${response.statusCode}';
+        // Возвращаем Map с ошибкой, а не бросаем исключение
+        return {
+          'success': false,
+          'error': errorMessage,
+          'statusCode': response.statusCode
+        };
       } catch (_) {
-        throw Exception('Ошибка ${response.statusCode}: ${response.body}');
+        return {
+          'success': false,
+          'error': 'Ошибка ${response.statusCode}: ${response.body}'
+        };
       }
     }
   }
+
+
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -244,7 +258,7 @@ class ApiService {
 
   static Future<Chat> getChatDetail(int chatId) async {
     final headers = await _getHeaders();
-    final url = Uri.parse(ApiConfig.chatDetail(chatId));
+    final url = Uri.parse(ApiConfig.chatDetailEndpoint(chatId)); // ← ИСПРАВЛЕНО
 
     ApiConfig.logRequest('GET', url.toString());
     
@@ -259,7 +273,8 @@ class ApiService {
   }
 
 
-  // Создать чат - ИСПРАВЛЕННАЯ ВЕРСИЯ (убрана попытка получить детали)
+  // Создать чат - ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ
+
   static Future<Chat> createChat(String name, bool isGroup,
       {List<int>? participants}) async {
     final headers = await _getHeaders();
@@ -267,23 +282,39 @@ class ApiService {
 
     Map<String, dynamic> body;
     
+    // ВЫНОСИМ ПЕРЕМЕННЫЕ ЗА ПРЕДЕЛЫ УСЛОВИЙ
+    final currentUser = await getCurrentUser();
+    final currentUserId = currentUser.id;
+    List<int> allParticipants = [];
+    
     if (isGroup) {
       if (participants == null || participants.isEmpty) {
         throw Exception('Для группового чата нужны участники');
       }
       
+      // Формируем полный список участников (текущий + выбранные)
+      allParticipants = [currentUserId, ...participants];
+      
+      // Правильное поле для группового чата - 'members'
+      final membersAsStrings = allParticipants.map((id) => id.toString()).toList();
+      
       body = {
         'name': name.trim(),
         'is_group': true,
-        'user_ids': participants,
+        'members': membersAsStrings, // ← КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
       };
+      
+      print('[DEBUG] Создание группового чата. Участники (все): $allParticipants');
     } else {
       if (participants == null || participants.isEmpty) {
         throw Exception('Для личного чата нужен ID другого пользователя');
       }
       
+      // Для личного чата используем только первого участника
+      allParticipants = [currentUserId, participants.first];
+      
       body = {
-        'user_id': participants.first,
+        'user_id': participants.first, // Для личного чата остаётся 'user_id'
       };
     }
 
@@ -299,52 +330,37 @@ class ApiService {
       final result = await _handleResponse(response);
       print('[DEBUG] Ответ создания чата: $result');
       
-      // WordPress возвращает успех, даже если чат "уже существует"
       if (result is Map<String, dynamic> && result['success'] == true) {
-        // ВАЖНО: НЕ вызываем getChatDetail()! Это вызывает ошибку 404.
-        // Бэкенд подтвердил, что чат есть (создан или уже существовал).
-        
-        // Если в ответе есть ID чата, создаем минимальный объект
         int? chatId;
         if (result['chat_id'] != null) {
           chatId = result['chat_id'] is int ? result['chat_id'] : int.tryParse(result['chat_id'].toString());
         }
         
         if (chatId != null) {
-          // Создаем временный объект Chat для возврата
+          // Создаём объект Chat с актуальными данными
           return Chat(
             id: chatId,
-            name: isGroup ? name.trim() : 'Чат', // Имя можно будет обновить позже из списка
+            name: isGroup ? name.trim() : 'Чат',
             avatar: null,
             isGroup: isGroup,
             createdAt: DateTime.now(),
-            userIds: participants,
+            userIds: allParticipants, // ← теперь переменная доступна
             lastMessageId: null,
           );
         }
         
-        // Если ID нет, но успех есть — чат создан/существует.
-        // Просто сообщаем об успехе, UI должен обновить список.
-        throw Exception('Чат успешно создан или уже существует. Обновите список чатов.');
+        // Если чат уже существует, всё равно создаём объект
+        if (result['chat_exists'] == true || result['message']?.contains('уже существует') == true) {
+          throw Exception('Чат уже существует. Обновите список чатов.');
+        }
+        
+        throw Exception('Чат успешно создан, но не получен ID. Ответ: $result');
       }
       
       throw Exception('Не удалось создать чат. Ответ: $result');
       
     } catch (e) {
       print('[ERROR] Ошибка создания чата: $e');
-      
-      // Различаем "ошибку создания" и "успех, но с 404 на getChatDetail"
-      if (e.toString().contains('Чат успешно создан')) {
-        // Это наше "успешное" исключение — пробрасываем как есть
-        rethrow;
-      }
-      
-      // Если ошибка связана с 404 от getChatDetail (старый код), сообщаем об успехе
-      if (e.toString().contains('404') && e.toString().contains('chat_id')) {
-        throw Exception('Чат создан или уже существует! Вернитесь в список чатов.');
-      }
-      
-      // Любая другая ошибка
       rethrow;
     }
   }
@@ -385,6 +401,10 @@ class ApiService {
     }
   }
 
+
+
+
+
   static Future<Message> sendTextMessage(int chatId, String text) async {
     final headers = await _getHeaders();
     final url = Uri.parse(ApiConfig.sendMessageEndpoint);
@@ -406,27 +426,120 @@ class ApiService {
       final result = await _handleResponse(response);
       print('[DEBUG] Ответ отправки текста: $result');
       
-      // Обрабатываем ответ WordPress
+      // Обрабатываем WordPress ответ
       if (result is Map<String, dynamic>) {
         if (result.containsKey('success') && result['success'] == true) {
+          
+          // ВАРИАНТ 1: WordPress возвращает message_id вместо id
+          if (result.containsKey('message_id')) {
+            // Создаём Map в формате для Message.fromJson
+            Map<String, dynamic> messageJson = {
+              'id': result['message_id'],
+              'chat_id': result['chat_id'],
+              'sender_id': result['sender_id'],
+              'text': result['text'],
+              'image': null,
+              'file': null,
+              'type': 'text',
+              'created_at': result['created_at'],
+            };
+            
+            return Message.fromJson(messageJson);
+          }
+          
+          // ВАРИАНТ 2: Есть вложенный объект message
           if (result.containsKey('message') && result['message'] is Map<String, dynamic>) {
-            return Message.fromJson(result['message'] as Map<String, dynamic>);
-          } else if (result.containsKey('data') && result['data'] is Map<String, dynamic>) {
-            return Message.fromJson(result['data'] as Map<String, dynamic>);
+            final messageData = result['message'] as Map<String, dynamic>;
+            
+            // Если в message тоже message_id вместо id
+            if (messageData.containsKey('message_id') && !messageData.containsKey('id')) {
+              messageData['id'] = messageData['message_id'];
+            }
+            
+            // Добавляем type если нет
+            if (!messageData.containsKey('type')) {
+              messageData['type'] = 'text';
+            }
+            
+            return Message.fromJson(messageData);
+          }
+          
+          // ВАРИАНТ 3: Есть вложенный объект data
+          if (result.containsKey('data') && result['data'] is Map<String, dynamic>) {
+            final data = result['data'] as Map<String, dynamic>;
+            
+            // Если в data тоже message_id вместо id
+            if (data.containsKey('message_id') && !data.containsKey('id')) {
+              data['id'] = data['message_id'];
+            }
+            
+            // Добавляем type если нет
+            if (!data.containsKey('type')) {
+              data['type'] = 'text';
+            }
+            
+            return Message.fromJson(data);
           }
         }
-        // Если данные возвращаются напрямую
+        
+        // ВАРИАНТ 4: Ответ уже содержит id напрямую
         if (result.containsKey('id')) {
-          return Message.fromJson(result);
+          // Добавляем type если нет
+          final Map<String, dynamic> resultWithType = Map.from(result);
+          if (!resultWithType.containsKey('type')) {
+            resultWithType['type'] = 'text';
+          }
+          
+          return Message.fromJson(resultWithType);
         }
       }
       
-      throw Exception('Не удалось отправить сообщение. Ответ: $result');
+      // Если ничего не подошло, но статус был 200-299
+      // Создаём локальное сообщение
+      if (result is Map<String, dynamic>) {
+        final messageJson = {
+          'id': result['message_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          'chat_id': chatId,
+          'sender_id': result['sender_id'] ?? 0,
+          'text': text,
+          'image': null,
+          'file': null,
+          'type': 'text',
+          'created_at': result['created_at'] ?? DateTime.now().toIso8601String(),
+        };
+        
+        return Message.fromJson(messageJson);
+      }
+      
+      // Резервный вариант
+      return Message(
+        id: DateTime.now().millisecondsSinceEpoch,
+        chatId: chatId,
+        senderId: 0, // Временный ID
+        text: text,
+        image: null,
+        file: null,
+        type: 'text',
+        createdAt: DateTime.now(),
+      );
+      
     } catch (e) {
       print('[ERROR] Ошибка отправки сообщения: $e');
-      rethrow;
+      
+      // Даже при ошибке создаём локальное сообщение
+      return Message(
+        id: DateTime.now().millisecondsSinceEpoch,
+        chatId: chatId,
+        senderId: 0, // Временный ID
+        text: text,
+        image: null,
+        file: null,
+        type: 'text',
+        createdAt: DateTime.now(),
+      );
     }
   }
+
 
   static Future<Message> sendMessageWithFile(
       int chatId, String text, File file, String type) async {
