@@ -54,17 +54,82 @@ class User {
     return null;
   }
 
+  // В конце класса User (после метода avatarUrl) добавьте:
   String get displayName {
-    List<String> parts = [];
-    if (lastName != null && lastName!.isNotEmpty) parts.add(lastName!);
+    // 1. Проверяем никнейм
+    if (nickname != null && nickname!.isNotEmpty) {
+      return nickname!;
+    }
+    
+    // 2. Формируем полное имя из частей
+    final List<String> parts = [];
     if (firstName != null && firstName!.isNotEmpty) parts.add(firstName!);
-    if (middleName != null && middleName!.isNotEmpty) parts.add(middleName!);
-    return parts.isEmpty ? (nickname ?? phone ?? 'Пользователь $id') : parts.join(' ');
+    if (lastName != null && lastName!.isNotEmpty) parts.add(lastName!);
+    
+    if (parts.isNotEmpty) {
+      return parts.join(' ');
+    }
+    
+    // 3. Если есть телефон, показываем его
+    if (phone != null && phone!.isNotEmpty) {
+      // Обрезаем телефон для красоты: +79161234567 → +7*** *** **67
+      final phoneStr = phone!;
+      if (phoneStr.length > 4) {
+        return 'Пользователь ${phoneStr.substring(0, 2)}***${phoneStr.substring(phoneStr.length - 2)}';
+      }
+      return 'Пользователь $phoneStr';
+    }
+    
+    // 4. Если совсем нет данных
+    return 'Пользователь';
+  }
+
+  // Также добавьте метод для отладки (в конце класса User):
+  Map<String, dynamic> toDebugMap() {
+    return {
+      'id': id,
+      'phone': phone,
+      'firstName': firstName,
+      'lastName': lastName,
+      'nickname': nickname,
+      'displayName': displayName,
+    };
+  }
+
+
+  String get shortName {
+    if (nickname != null && nickname!.isNotEmpty) {
+      return nickname![0].toUpperCase();
+    }
+    
+    if (firstName != null && firstName!.isNotEmpty) {
+      return firstName![0].toUpperCase();
+    }
+    
+    if (lastName != null && lastName!.isNotEmpty) {
+      return lastName![0].toUpperCase();
+    }
+    
+    return 'U';
   }
 
   String? get avatarUrl {
-    if (avatar == null || avatar!.isEmpty) return null;
+    if (avatar == null || avatar!.isEmpty || avatar == 'false') return null;
     if (avatar!.startsWith('http')) return avatar;
     return '${ApiConfig.uploadsUrl}/$avatar';
+  }
+
+  // Для создания пустого пользователя
+  static User empty() {
+    return User(
+      id: 0,
+      phone: null,
+      avatar: null,
+      lastName: null,
+      firstName: null,
+      middleName: null,
+      nickname: null,
+      createdAt: null,
+    );
   }
 }
