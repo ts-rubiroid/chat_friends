@@ -16,12 +16,27 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        // Дополнительно можно задать padding для Scaffold
+        scaffoldBackgroundColor: Colors.white,
       ),
+      // Простое глобальное решение
+      builder: (context, child) {
+        return SafeArea(
+          bottom: true, // защита от нижней панели
+          left: true,
+          right: true,
+          top: true,
+          minimum: EdgeInsets.only(bottom: 16), // +16 пикселей снизу
+          child: child!,
+        );
+      },
       home: FutureBuilder(
         future: ApiService.getToken(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Scaffold(body: Center(child: CircularProgressIndicator()));
+            return Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
           }
           
           if (snapshot.hasData && snapshot.data != null) {
@@ -31,6 +46,7 @@ class MyApp extends StatelessWidget {
           }
         },
       ),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

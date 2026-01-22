@@ -71,6 +71,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    
     return Scaffold(
       appBar: AppBar(
         title: Text('Чаты'),
@@ -141,4 +142,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ),
     );
   }
+
+
+
+  
 }
