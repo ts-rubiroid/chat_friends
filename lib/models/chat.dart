@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../utils/api.dart';
 import 'message.dart';
 import 'user.dart';
@@ -13,6 +14,7 @@ class Chat {
   final Message? lastMessage;
   final List<User>? members;
   final int unreadCount;
+  final User? creator; // Создатель чата
 
   Chat({
     required this.id,
@@ -25,6 +27,7 @@ class Chat {
     this.lastMessage,
     this.members,
     this.unreadCount = 0,
+    this.creator,
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) {
@@ -43,6 +46,32 @@ class Chat {
       lastMessage = Message.fromJson(json['last_message'] as Map<String, dynamic>);
     }
 
+    // Ищем создателя в нескольких возможных местах
+    User? creator;
+    
+    // 1. Прямое поле 'creator'
+    if (json['creator'] != null && json['creator'] is Map<String, dynamic>) {
+      creator = User.fromJson(json['creator'] as Map<String, dynamic>);
+    }
+    // 2. Поле 'created_by' 
+    else if (json['created_by'] != null && json['created_by'] is Map<String, dynamic>) {
+      creator = User.fromJson(json['created_by'] as Map<String, dynamic>);
+    }
+    // 3. Поле 'author'
+    else if (json['author'] != null && json['author'] is Map<String, dynamic>) {
+      creator = User.fromJson(json['author'] as Map<String, dynamic>);
+    }
+    // 4. Вложенное поле 'data.creator'
+    else if (json['data'] != null && 
+             json['data'] is Map<String, dynamic> && 
+             json['data']['creator'] != null) {
+      creator = User.fromJson(json['data']['creator'] as Map<String, dynamic>);
+    }
+    // 5. Первый участник как создатель (резервный вариант)
+    else if (members != null && members.isNotEmpty) {
+      creator = members.first;
+    }
+
     return Chat(
       id: _parseInt(json['id']),
       name: json['name']?.toString() ?? 'Без названия',
@@ -56,6 +85,7 @@ class Chat {
       lastMessage: lastMessage,
       members: members,
       unreadCount: json['unread_count'] is int ? json['unread_count'] : 0,
+      creator: creator,
     );
   }
 
@@ -95,7 +125,6 @@ class Chat {
     }
   }
 
-
   User? getOtherUser(User currentUser, List<User>? allUsers) {
     if (isGroup) return null;
     
@@ -123,8 +152,6 @@ class Chat {
     
     return null;
   }
-
-
 
   String getSubtitle(User currentUser, {List<User>? allUsers}) {
     if (isGroup) {
@@ -161,5 +188,74 @@ class Chat {
       nickname: null,
       createdAt: null,
     );
+  }
+
+  String getCorrectedName() {
+    if (!isGroup) return name;
+    
+    // Исправляем неправильное название от сервера
+    if (name.contains('Сообщение от пользователя')) {
+      // Возвращаем имя первого участника + " (группа)"
+      if (members != null && members!.isNotEmpty) {
+        return '${members!.first.displayName} (группа)';
+      }
+    }
+    
+    return name;
+  }
+
+  // Имя создателя для отображения (ник или имя)
+  String get creatorDisplayName {
+    if (creator != null) {
+      // Используем никнейм если есть, иначе имя
+      if (creator!.nickname != null && creator!.nickname!.isNotEmpty) {
+        return creator!.nickname!;
+      }
+      return creator!.firstName ?? 'Неизвестно';
+    }
+    return 'Неизвестно';
+  }
+
+  // Количество участников
+  int get memberCount {
+    if (members != null && members!.isNotEmpty) {
+      return members!.length;
+    }
+    if (userIds != null && userIds!.isNotEmpty) {
+      return userIds!.length;
+    }
+    return 0;
+  }
+
+  // Текст с правильным склонением "участников"
+  String get memberCountText {
+    final count = memberCount;
+    if (count == 0) return 'нет участников';
+    
+    final lastDigit = count % 10;
+    final lastTwoDigits = count % 100;
+    
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+      return '$count участников';
+    }
+    
+    switch (lastDigit) {
+      case 1:
+        return '$count участник';
+      case 2:
+      case 3:
+      case 4:
+        return '$count участника';
+      default:
+        return '$count участников';
+    }
+  }
+
+  // Фон для группового чата (темнее чем для личного)
+  Color get backgroundColor {
+    if (isGroup) {
+      return Colors.grey[200]!; // Темный серый для групповых
+    }
+    return Colors.transparent; // Прозрачный для личных
   }
 }

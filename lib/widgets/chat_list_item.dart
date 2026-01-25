@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/user.dart';
-import 'package:chat_friends/utils/api.dart';
 
 class ChatListItem extends StatelessWidget {
   final Chat chat;
@@ -21,14 +20,20 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final otherUser = chat.isGroup ? null : chat.getOtherUser(currentUser, allUsers);
+    final isCurrentUserCreator = _isCurrentUserCreator();
+    final displayCreator = _getDisplayCreator();
     
     return Container(
       padding: EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: chat.isGroup ? Colors.grey[50] : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: ListTile(
         onTap: onTap,
-        leading: _buildAvatar(otherUser),
-        title: _buildTitle(otherUser),
-        subtitle: _buildSubtitle(otherUser),
+        leading: _buildAvatar(otherUser, displayCreator),
+        title: _buildTitle(otherUser, isCurrentUserCreator),
+        subtitle: _buildSubtitle(otherUser, displayCreator),
         trailing: _buildTrailing(),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         minVerticalPadding: 12,
@@ -36,19 +41,23 @@ class ChatListItem extends StatelessWidget {
     );
   }
 
-
-  Widget _buildAvatar(User? otherUser) {
+  Widget _buildAvatar(User? otherUser, User? displayCreator) {
     String? avatarUrl;
     String fallbackText;
     
     if (chat.isGroup) {
-      // Для группового чата
-      avatarUrl = chat.avatarUrl;
-      fallbackText = chat.name.isNotEmpty ? chat.name[0].toUpperCase() : 'G';
+      // Для группового чата - используем аватар "предполагаемого" создателя
+      if (displayCreator != null) {
+        avatarUrl = displayCreator.avatarUrl;
+        fallbackText = displayCreator.shortName;
+      } else {
+        // Если не нашли создателя, используем первую букву названия
+        fallbackText = _getGroupFallbackText();
+      }
     } else {
       // Для личного чата - аватар собеседника
       avatarUrl = otherUser?.avatarUrl;
-      fallbackText = otherUser?.shortName ?? 'U';
+      fallbackText = otherUser?.shortName ?? '?';
     }
     
     return Stack(
@@ -58,13 +67,18 @@ class ChatListItem extends StatelessWidget {
           height: 50,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.grey[300],
+            color: chat.isGroup ? Colors.blueGrey[100] : Colors.grey[300],
           ),
-          child: avatarUrl != null
+          child: avatarUrl != null && avatarUrl.isNotEmpty
               ? ClipOval(
                   child: CachedNetworkImage(
-                    imageUrl: avatarUrl!,
-                    placeholder: (context, url) => Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    imageUrl: avatarUrl,
+                    placeholder: (context, url) => Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                      ),
+                    ),
                     errorWidget: (context, url, error) => Center(
                       child: Text(
                         fallbackText,
@@ -108,48 +122,33 @@ class ChatListItem extends StatelessWidget {
     );
   }
 
-
-  Widget _buildTitle(User? otherUser) {
+  Widget _buildTitle(User? otherUser, bool isCurrentUserCreator) {
     if (chat.isGroup) {
-      // Групповой чат: название + создатель
-      final creator = _getGroupCreator();
-      final creatorName = creator?.displayName ?? 'Неизвестно';
+      String displayName = chat.name;
       
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Название чата (жирное)
-          Text(
-            chat.name,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: chat.hasUnread ? Colors.black : Colors.grey[800],
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-          // Создатель (меньший шрифт)
-          SizedBox(height: 2),
-          Text(
-            'Создан: $creatorName',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ],
+      // Исправляем неправильное название от сервера
+      if (displayName.contains('Сообщение от пользователя')) {
+        displayName = _getCorrectedGroupName(isCurrentUserCreator);
+      }
+      
+      return Text(
+        displayName,
+        style: TextStyle(
+          fontWeight: chat.hasUnread ? FontWeight.bold : FontWeight.normal,
+          fontSize: 16,
+          color: chat.hasUnread ? Colors.black : Colors.grey[800],
+        ),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 1,
       );
     } else {
-      // Личный чат: "От [Имя/Никнейм]"
+      // Личный чат
       String title;
       
       if (otherUser != null && otherUser.id > 0) {
         title = 'От ${otherUser.displayName}';
       } else {
-        title = _extractNameFromChatTitle(chat.name);
+        title = chat.name;
       }
       
       return Text(
@@ -165,24 +164,24 @@ class ChatListItem extends StatelessWidget {
     }
   }
 
-
-  Widget _buildSubtitle(User? otherUser) {
+  Widget _buildSubtitle(User? otherUser, User? displayCreator) {
     if (chat.isGroup) {
-      // Групповой чат: "Группа: [количество] участника"
+      // Групповой чат
+      final creatorName = displayCreator?.displayName ?? 'Неизвестно';
       final memberCount = _getGroupMemberCount();
       final countText = _getParticipantsText(memberCount);
       
       return Text(
-        'Группа: $countText',
+        'Создал: $creatorName, $countText',
         style: TextStyle(
           color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
-          fontSize: 14,
+          fontSize: 12,
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
       );
     } else {
-      // Личный чат: "[начало сообщения...]"
+      // Личный чат
       final messagePreview = chat.getLastMessagePreview();
       return Text(
         messagePreview,
@@ -196,7 +195,6 @@ class ChatListItem extends StatelessWidget {
       );
     }
   }
-
 
   Widget _buildTrailing() {
     return Column(
@@ -233,40 +231,63 @@ class ChatListItem extends StatelessWidget {
   }
 
   // Вспомогательные методы
-  User? _getGroupCreator() {
-    if (!chat.isGroup) return null;
+  bool _isCurrentUserCreator() {
+    if (!chat.isGroup) return false;
     
-    // Если есть members, берём первого (обычно это создатель)
-    if (chat.members != null && chat.members!.isNotEmpty) {
-      return chat.members!.first;
+    // Проверяем, есть ли текущий пользователь в участниках
+    if (chat.members != null) {
+      return chat.members!.any((member) => member.id == currentUser.id);
     }
     
-    // Если есть userIds, ищем первого пользователя в allUsers
-    if (chat.userIds != null && chat.userIds!.isNotEmpty && allUsers != null) {
-      for (final id in chat.userIds!) {
-        if (id > 0) {
-          final creator = allUsers!.firstWhere(
-            (user) => user.id == id,
-            orElse: () => User.empty(),
-          );
-          if (creator.id > 0) return creator;
-        }
-      }
+    return false;
+  }
+
+  User? _getDisplayCreator() {
+    if (!chat.isGroup) return null;
+    
+    // 1. Сначала проверяем, может текущий пользователь - создатель
+    if (_isCurrentUserCreator()) {
+      return currentUser;
+    }
+    
+    // 2. Ищем первого участника (временное решение)
+    if (chat.members != null && chat.members!.isNotEmpty) {
+      return chat.members!.first;
     }
     
     return null;
   }
 
+  String _getCorrectedGroupName(bool isCurrentUserCreator) {
+    if (isCurrentUserCreator) {
+      return 'Моя группа';
+    }
+    
+    final creator = _getDisplayCreator();
+    if (creator != null) {
+      return 'Группа ${creator.displayName}';
+    }
+    
+    return 'Групповой чат';
+  }
+
+  String _getGroupFallbackText() {
+    final creator = _getDisplayCreator();
+    if (creator != null) {
+      return creator.shortName;
+    }
+    
+    return chat.name.isNotEmpty ? chat.name[0].toUpperCase() : 'Г';
+  }
+
   int _getGroupMemberCount() {
     if (!chat.isGroup) return 0;
     
-    // Из members
-    if (chat.members != null && chat.members!.isNotEmpty) {
+    if (chat.members != null) {
       return chat.members!.length;
     }
     
-    // Из userIds
-    if (chat.userIds != null && chat.userIds!.isNotEmpty) {
+    if (chat.userIds != null) {
       return chat.userIds!.length;
     }
     
@@ -293,25 +314,6 @@ class ChatListItem extends StatelessWidget {
       default:
         return '$count участников';
     }
-  }
-
-  String _extractNameFromChatTitle(String chatTitle) {
-    if (chatTitle.contains('Последнее от')) {
-      final idMatch = RegExp(r'пользователя (\d+)').firstMatch(chatTitle);
-      if (idMatch != null) {
-        final id = idMatch.group(1);
-        return 'От Ползовател $id';
-      }
-    }
-    
-    if (chatTitle.contains(' и ')) {
-      final parts = chatTitle.split(' и ');
-      if (parts.length > 1) {
-        return 'От ${parts.last}';
-      }
-    }
-    
-    return chatTitle;
   }
 
   String _formatTime(DateTime time) {

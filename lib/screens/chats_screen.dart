@@ -26,26 +26,23 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _loadData();
   }
 
-
   Future<void> _loadData() async {
     try {
-      // Загружаем данные последовательно для простоты
       final chats = await ApiService.getChats();
       final allUsers = await ApiService.getAllUsers();
       final currentUser = await ApiService.getCurrentUser();
       
-      print('[DEBUG ChatsScreen] Loaded:');
-      print('  Chats: ${chats.length}');
-      print('  All Users: ${allUsers.length}');
-      print('  Current User ID: ${currentUser.id}');
-
-      // Для каждого чата выводим информацию
-      for (final chat in chats) {
-        print('  Chat ${chat.id}: ${chat.name} | Group: ${chat.isGroup} | User IDs: ${chat.userIds}');
-      }
-
-
-
+      // СОРТИРОВКА: сначала непрочитанные, потом по дате последнего сообщения
+      chats.sort((a, b) {
+        // 1. Непрочитанные выше прочитанных
+        if (a.hasUnread && !b.hasUnread) return -1;
+        if (!a.hasUnread && b.hasUnread) return 1;
+        
+        // 2. По дате последнего сообщения (новые выше)
+        final aTime = a.lastMessage?.createdAt ?? a.createdAt ?? DateTime(1970);
+        final bTime = b.lastMessage?.createdAt ?? b.createdAt ?? DateTime(1970);
+        return bTime.compareTo(aTime);
+      });
 
       setState(() {
         _chats = chats;
@@ -55,14 +52,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
       });
     } catch (e) {
       print('Ошибка загрузки данных: $e');
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() { _isLoading = false; });
     }
   }
-
-
 
   void _onRefresh() async {
     await _loadData();
@@ -125,7 +117,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                               MaterialPageRoute(
                                 builder: (context) => ChatScreen(chat: chat),
                               ),
-                            ).then((_) => _loadData()); // Обновляем при возврате
+                            ).then((_) => _loadData());
                           },
                         );
                       },
@@ -142,8 +134,4 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ),
     );
   }
-
-
-
-  
 }

@@ -379,6 +379,34 @@ class ApiService {
     return false;
   }
 
+  // НОВЫЙ МЕТОД: Получить создателя чата
+  static Future<User> getChatCreator(int chatId) async {
+    final headers = await _getHeaders();
+    final url = Uri.parse('${ApiConfig.baseUrl}/chat-api/v1/chats/$chatId/creator');
+
+    ApiConfig.logRequest('GET', url.toString());
+    
+    try {
+      final response = await http.get(url, headers: headers);
+      final result = await _handleResponse(response);
+      
+      if (result.containsKey('success') && result['success'] == true) {
+        if (result.containsKey('creator') && result['creator'] is Map<String, dynamic>) {
+          return User.fromJson(result['creator'] as Map<String, dynamic>);
+        }
+      }
+      
+      // Если не удалось получить создателя, возвращаем пустого пользователя
+      print('[WARNING] Не удалось получить создателя чата $chatId. Ответ: $result');
+      return User.empty();
+    } catch (e) {
+      print('[ERROR] Ошибка получения создателя чата $chatId: $e');
+      return User.empty();
+    }
+  }
+
+
+
   // === СООБЩЕНИЯ ===
 
   // Получить сообщения чата - ИСПРАВЛЕННАЯ ВЕРСИЯ
