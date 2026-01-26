@@ -32,13 +32,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
       final allUsers = await ApiService.getAllUsers();
       final currentUser = await ApiService.getCurrentUser();
       
-      // СОРТИРОВКА: сначала непрочитанные, потом по дате последнего сообщения
       chats.sort((a, b) {
-        // 1. Непрочитанные выше прочитанных
         if (a.hasUnread && !b.hasUnread) return -1;
         if (!a.hasUnread && b.hasUnread) return 1;
         
-        // 2. По дате последнего сообщения (новые выше)
         final aTime = a.lastMessage?.createdAt ?? a.createdAt ?? DateTime(1970);
         final bTime = b.lastMessage?.createdAt ?? b.createdAt ?? DateTime(1970);
         return bTime.compareTo(aTime);
@@ -124,11 +121,33 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     ),
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          // ОТКРЫВАЕМ ЭКРАН СОЗДАНИЯ И ЖДЕМ РЕЗУЛЬТАТ
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => CreateChatScreen()),
-          ).then((_) => _loadData());
+          );
+          
+          // ЕСЛИ ВЕРНУЛСЯ СОЗДАННЫЙ ЧАТ - ОТКРЫВАЕМ ЕГО
+          if (result is Chat) {
+            print('[DEBUG] Получен созданный чат: ${result.id}');
+            await _loadData(); // Обновляем список
+            
+            // НЕМНОГО ЖДЕМ, ЧТОБЫ СПИСОК ОБНОВИЛСЯ
+            await Future.delayed(Duration(milliseconds: 300));
+            
+            // ОТКРЫВАЕМ СОЗДАННЫЙ ЧАТ
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(chat: result),
+              ),
+            ).then((_) => _loadData());
+          } 
+          // ЕСЛИ ЧАТ НЕ БЫЛ СОЗДАН (null) - ПРОСТО ОБНОВЛЯЕМ СПИСОК
+          else if (result == null) {
+            _loadData();
+          }
         },
         child: Icon(Icons.add),
       ),

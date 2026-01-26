@@ -32,7 +32,7 @@ class ChatListItem extends StatelessWidget {
       child: ListTile(
         onTap: onTap,
         leading: _buildAvatar(otherUser, displayCreator),
-        title: _buildTitle(otherUser, isCurrentUserCreator),
+        title: _buildTitle(otherUser),
         subtitle: _buildSubtitle(otherUser, displayCreator),
         trailing: _buildTrailing(),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -122,17 +122,11 @@ class ChatListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle(User? otherUser, bool isCurrentUserCreator) {
+  Widget _buildTitle(User? otherUser) {
     if (chat.isGroup) {
-      String displayName = chat.name;
-      
-      // Исправляем неправильное название от сервера
-      if (displayName.contains('Сообщение от пользователя')) {
-        displayName = _getCorrectedGroupName(isCurrentUserCreator);
-      }
-      
+      // ДЛЯ ГРУППОВЫХ: Просто показываем название чата
       return Text(
-        displayName,
+        chat.name.isNotEmpty ? chat.name : 'Групповой чат',
         style: TextStyle(
           fontWeight: chat.hasUnread ? FontWeight.bold : FontWeight.normal,
           fontSize: 16,
@@ -142,11 +136,11 @@ class ChatListItem extends StatelessWidget {
         maxLines: 1,
       );
     } else {
-      // Личный чат
+      // ДЛЯ ЛИЧНЫХ: имя собеседника
       String title;
       
       if (otherUser != null && otherUser.id > 0) {
-        title = 'От ${otherUser.displayName}';
+        title = otherUser.displayName;
       } else {
         title = chat.name;
       }

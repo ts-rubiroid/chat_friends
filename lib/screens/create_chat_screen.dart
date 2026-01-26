@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/models/user.dart';
+import 'package:chat_friends/models/chat.dart'; // Добавляем импорт
 
 class CreateChatScreen extends StatefulWidget {
   @override
@@ -14,6 +15,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
   List<int> _selectedUserIds = [];
   bool _isLoading = true;
   String _error = '';
+  bool _isCreating = false; // Новый флаг для отслеживания создания
 
   @override
   void initState() {
@@ -62,24 +64,37 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       return;
     }
 
-    // Отладка
-    print('[UI DEBUG] Создание чата: группа=$_isGroup, участники=$_selectedUserIds');
+    setState(() {
+      _isCreating = true; // Блокируем кнопку
+    });
 
     try {
-      await ApiService.createChat(
+      // СОЗДАЕМ ЧАТ И ПОЛУЧАЕМ ЕГО ОБЪЕКТ
+      final Chat createdChat = await ApiService.createChat(
         _nameController.text,
         _isGroup,
         participants: _selectedUserIds,
       );
       
-      Navigator.pop(context, true);
+      print('[DEBUG] Чат создан успешно: ${createdChat.id}');
+      
+      // ВОЗВРАЩАЕМ СОЗДАННЫЙ ЧАТ НАЗАД
+      if (mounted) {
+        Navigator.pop(context, createdChat);
+      }
+      
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка создания чата: $e')),
-      );
+      print('Ошибка создания чата: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка создания чата: $e')),
+        );
+        setState(() {
+          _isCreating = false;
+        });
+      }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +119,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                 SizedBox(width: 10),
                 Switch(
                   value: _isGroup,
-                  onChanged: (value) {
+                  onChanged: _isCreating ? null : (value) { // Блокируем при создании
                     setState(() {
                       _isGroup = value;
                     });
@@ -134,7 +149,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                       return RadioListTile<int>(
                         value: user.id,
                         groupValue: _selectedUserIds.isNotEmpty ? _selectedUserIds.first : null,
-                        onChanged: (value) {
+                        onChanged: _isCreating ? null : (value) { // Блокируем при создании
                           setState(() {
                             _selectedUserIds = [value!]; // Только один ID
                           });
@@ -145,7 +160,7 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
                       // Для группового чата - checkbox (множественный выбор)
                       return CheckboxListTile(
                         value: _selectedUserIds.contains(user.id),
-                        onChanged: (value) => _toggleUserSelection(user.id),
+                        onChanged: _isCreating ? null : (value) => _toggleUserSelection(user.id), // Блокируем
                         title: Text(user.displayName),
                       );
                     }
@@ -155,8 +170,21 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
             
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _createChat,
-              child: Text('Создать чат'),
+              onPressed: _isCreating ? null : _createChat, // Блокируем при создании
+              child: _isCreating
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        SizedBox(width: 10),
+                        Text('Создание...'),
+                      ],
+                    )
+                  : Text('Создать чат'),
               style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 50),
               ),
@@ -176,5 +204,4 @@ class _CreateChatScreenState extends State<CreateChatScreen> {
       }
     });
   }
-
 }
