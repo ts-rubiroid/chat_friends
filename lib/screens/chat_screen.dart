@@ -235,6 +235,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           ],
                         ),
                       )
+
+
+                      
                     : ListView.builder(
                         reverse: true,
                         itemCount: _messages.length,
@@ -359,7 +362,8 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           );
                         },
-                      ),
+                      ),          
+      
           ),
           
           Padding(

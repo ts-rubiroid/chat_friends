@@ -42,23 +42,107 @@ class ChatListItem extends StatelessWidget {
   }
 
   Widget _buildAvatar(User? otherUser, User? displayCreator) {
-    String? avatarUrl;
-    String fallbackText;
+    // === ОТЛАДОЧНЫЙ КОД ===
+    print('══════════════════════════════════════');
+    print('🔄 DEBUG AVATAR для чата ID: ${chat.id}');
+    print('📝 Название чата: ${chat.name}');
+    print('👥 Тип: ${chat.isGroup ? "Групповой" : "Личный"}');
     
     if (chat.isGroup) {
-      // Для группового чата - используем аватар "предполагаемого" создателя
+      print('👑 Групповой чат');
       if (displayCreator != null) {
-        avatarUrl = displayCreator.avatarUrl;
-        fallbackText = displayCreator.shortName;
+        print('   Создатель ID: ${displayCreator.id}');
+        print('   Создатель имя: ${displayCreator.displayName}');
+        print('   Поле avatar (сырое): ${displayCreator.avatar}');
+        print('   Метод avatarUrl: ${displayCreator.avatarUrl}');
+        print('   hasAvatar: ${displayCreator.hasAvatar}');
+        print('   Длина URL: ${displayCreator.avatarUrl.length}');
+        print('   Начинается с http?: ${displayCreator.avatarUrl.startsWith("http")}');
       } else {
-        // Если не нашли создателя, используем первую букву названия
-        fallbackText = _getGroupFallbackText();
+        print('   ❌ Создатель не найден');
       }
     } else {
-      // Для личного чата - аватар собеседника
-      avatarUrl = otherUser?.avatarUrl;
-      fallbackText = otherUser?.shortName ?? '?';
+      print('🤝 Личный чат');
+      if (otherUser != null) {
+        print('   Собеседник ID: ${otherUser.id}');
+        print('   Собеседник имя: ${otherUser.displayName}');
+        print('   Поле avatar (сырое): "${otherUser.avatar}"');
+        print('   Метод avatarUrl: "${otherUser.avatarUrl}"');
+        print('   hasAvatar: ${otherUser.hasAvatar}');
+        print('   Длина URL: ${otherUser.avatarUrl.length}');
+        print('   Начинается с http?: ${otherUser.avatarUrl.startsWith("http")}');
+        print('   Начинается с https?: ${otherUser.avatarUrl.startsWith("https")}');
+        print('   Содержит \\/: ${otherUser.avatar?.contains(r"\/") ?? false}');
+        print('   Явная проверка: avatar != null: ${otherUser.avatar != null}');
+        print('   Явная проверка: avatar.isNotEmpty: ${otherUser.avatar?.isNotEmpty ?? false}');
+        print('   Явная проверка: avatar != "null": ${otherUser.avatar != "null"}');
+        print('   Явная проверка: avatar != "false": ${otherUser.avatar != "false"}');
+      } else {
+        print('   ❌ Собеседник не найден');
+      }
     }
+    print('══════════════════════════════════════');
+    // === КОНЕЦ ОТЛАДОЧНОГО КОДА ===
+    
+    // Определяем аватар для отображения
+    String avatarUrl = '';
+    String fallbackText = '?';
+    Color fallbackColor = Colors.blue;
+    
+    if (chat.isGroup) {
+      // Групповой чат
+      if (displayCreator != null) {
+        // ПРЯМАЯ ПРОВЕРКА аватара создателя
+        if (displayCreator.avatar != null && 
+            displayCreator.avatar!.isNotEmpty && 
+            displayCreator.avatar != 'null' &&
+            displayCreator.avatar != 'false') {
+          
+          // Очищаем URL от экранированных слешей
+          avatarUrl = displayCreator.avatar!.replaceAll(r'\/', '/');
+          print('✅ Используем аватар создателя: $avatarUrl');
+        }
+        fallbackText = displayCreator.initials;
+        fallbackColor = displayCreator.avatarColor;
+      } else {
+        fallbackText = chat.initials;
+        fallbackColor = chat.avatarColor;
+      }
+    } else {
+      // Личный чат
+      if (otherUser != null) {
+        // ПРЯМАЯ ПРОВЕРКА аватара собеседника
+        if (otherUser.avatar != null && 
+            otherUser.avatar!.isNotEmpty && 
+            otherUser.avatar != 'null' &&
+            otherUser.avatar != 'false') {
+          
+          // Очищаем URL от экранированных слешей
+          avatarUrl = otherUser.avatar!.replaceAll(r'\/', '/');
+          print('✅ Используем аватар собеседника: $avatarUrl');
+        }
+        fallbackText = otherUser.initials;
+        fallbackColor = otherUser.avatarColor;
+      }
+    }
+    
+    // Если не нашли аватар вручную, пробуем через метод
+    if (avatarUrl.isEmpty && otherUser != null && !chat.isGroup) {
+      avatarUrl = otherUser.avatarUrl;
+      print('🔄 Пробуем через avatarUrl метод: $avatarUrl');
+    }
+    
+    // Финальная проверка URL
+    final isValidUrl = avatarUrl.isNotEmpty && 
+                      avatarUrl.startsWith('http') &&
+                      !avatarUrl.contains(r'\/');
+    
+    print('🔍 Финальная проверка:');
+    print('   avatarUrl: "$avatarUrl"');
+    print('   isValidUrl: $isValidUrl');
+    print('   isNotEmpty: ${avatarUrl.isNotEmpty}');
+    print('   startsWith http: ${avatarUrl.startsWith("http")}');
+    print('   содержит \/: ${avatarUrl.contains(r"\/")}');
     
     return Stack(
       children: [
@@ -67,41 +151,30 @@ class ChatListItem extends StatelessWidget {
           height: 50,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: chat.isGroup ? Colors.blueGrey[100] : Colors.grey[300],
+            color: isValidUrl ? Colors.transparent : fallbackColor,
           ),
-          child: avatarUrl != null && avatarUrl.isNotEmpty
+          child: isValidUrl
               ? ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: avatarUrl,
-                    placeholder: (context, url) => Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Center(
-                      child: Text(
-                        fallbackText,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
+                  child: Image.network(
+                    avatarUrl,
                     fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      print('❌ Ошибка загрузки аватара: $error');
+                      print('❌ URL: $avatarUrl');
+                      return _buildFallbackAvatar(fallbackText, fallbackColor);
+                    },
                   ),
                 )
-              : Center(
-                  child: Text(
-                    fallbackText,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
+              : _buildFallbackAvatar(fallbackText, fallbackColor),
         ),
         // Зелёный кружок для непрочитанных
         if (chat.hasUnread)
@@ -119,6 +192,26 @@ class ChatListItem extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  // Вспомогательный метод для отображения аватара с инициалами
+  Widget _buildFallbackAvatar(String text, Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+      ),
     );
   }
 
@@ -224,7 +317,7 @@ class ChatListItem extends StatelessWidget {
     );
   }
 
-  // Вспомогательные методы
+  // Вспомогательные методы (без изменений)
   bool _isCurrentUserCreator() {
     if (!chat.isGroup) return false;
     
@@ -252,26 +345,18 @@ class ChatListItem extends StatelessWidget {
     return null;
   }
 
-  String _getCorrectedGroupName(bool isCurrentUserCreator) {
-    if (isCurrentUserCreator) {
-      return 'Моя группа';
-    }
-    
-    final creator = _getDisplayCreator();
-    if (creator != null) {
-      return 'Группа ${creator.displayName}';
-    }
-    
-    return 'Групповой чат';
-  }
-
   String _getGroupFallbackText() {
     final creator = _getDisplayCreator();
     if (creator != null) {
       return creator.shortName;
     }
     
-    return chat.name.isNotEmpty ? chat.name[0].toUpperCase() : 'Г';
+    // ВАЖНО: Проверяем что имя не пустое перед доступом к [0]
+    if (chat.name.isNotEmpty) {
+      return chat.name[0].toUpperCase();
+    }
+    
+    return 'Г'; // Запасной вариант
   }
 
   int _getGroupMemberCount() {

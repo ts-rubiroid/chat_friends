@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import '../utils/api.dart';
 
 class User {
@@ -25,7 +26,8 @@ class User {
     return User(
       id: _parseInt(json['id']),
       phone: json['phone']?.toString(),
-      avatar: json['avatar']?.toString(),
+      // ИСПРАВЛЕНИЕ: Используем очистку URL
+      avatar: _cleanAvatarUrl(json['avatar']?.toString()),
       lastName: json['last_name']?.toString(),
       firstName: json['first_name']?.toString(),
       middleName: json['middle_name']?.toString(),
@@ -37,7 +39,10 @@ class User {
   static int _parseInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
-    if (value is String) return int.tryParse(value) ?? 0;
+    if (value is String) {
+      if (value == 'null' || value.isEmpty) return 0;
+      return int.tryParse(value) ?? 0;
+    }
     return 0;
   }
 
@@ -45,6 +50,7 @@ class User {
     if (value == null) return null;
     if (value is DateTime) return value;
     if (value is String) {
+      if (value == 'null' || value.isEmpty) return null;
       try {
         return DateTime.parse(value);
       } catch (_) {
@@ -54,7 +60,119 @@ class User {
     return null;
   }
 
-  // В конце класса User (после метода avatarUrl) добавьте:
+  // ДОБАВЬТЕ ЭТОТ МЕТОД СЮДА:
+  static String? _cleanAvatarUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    
+    // Убираем экранированные слеши из JSON
+    final cleanedUrl = url.replaceAll(r'\/', '/');
+    
+    // Убираем возможные двойные слеши
+    return cleanedUrl.replaceAll('//', '/').replaceFirst(':/', '://');
+  }
+
+  // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Метод должен возвращать строку, а не null
+  String get avatarUrl {
+    // 1. Если аватар есть и валиден
+    if (avatar != null && avatar!.isNotEmpty && avatar != 'null' && avatar != 'false') {
+      // Уже очищено в конструкторе, но на всякий случай еще раз
+      final cleanedUrl = avatar!.replaceAll(r'\/', '/');
+      
+      if (cleanedUrl.startsWith('http')) {
+        return cleanedUrl;
+      }
+      
+      // Если относительный путь
+      if (ApiConfig.uploadsUrl != null) {
+        // Если начинается с /, убираем его
+        final path = cleanedUrl.startsWith('/') ? cleanedUrl.substring(1) : cleanedUrl;
+        return '${ApiConfig.uploadsUrl}/$path';
+      }
+      
+      // Последняя попытка - добавляем base URL
+      if (!cleanedUrl.startsWith('http')) {
+        return 'https://chat.remont-gazon.ru$cleanedUrl';
+      }
+    }
+    
+    // 2. Если аватара нет - возвращаем пустую строку
+    return '';
+  }
+
+  // ... остальные методы класса User остаются без изменений
+  // Метод для проверки, есть ли реальный URL аватарки
+  bool get hasAvatar => avatarUrl.isNotEmpty;
+
+  // Генерация инициалов для дефолтного аватара
+  String get initials {
+    // Сначала пробуем никнейм
+    if (nickname != null && nickname!.isNotEmpty) {
+      return nickname![0].toUpperCase();
+    }
+    
+    // Потом пробуем имя + фамилия
+    if (firstName != null && firstName!.isNotEmpty && lastName != null && lastName!.isNotEmpty) {
+      return '${firstName![0]}${lastName![0]}'.toUpperCase();
+    }
+    
+    // Только имя
+    if (firstName != null && firstName!.isNotEmpty) {
+      final length = firstName!.length;
+      if (length >= 2) {
+        return firstName!.substring(0, 2).toUpperCase();
+      }
+      if (length == 1) {
+        return firstName!.toUpperCase();
+      }
+    }
+    
+    // Только фамилия
+    if (lastName != null && lastName!.isNotEmpty) {
+      final length = lastName!.length;
+      if (length >= 2) {
+        return lastName!.substring(0, 2).toUpperCase();
+      }
+      if (length == 1) {
+        return lastName!.toUpperCase();
+      }
+    }
+    
+    // Если телефон есть - используем первую цифру
+    if (phone != null && phone!.isNotEmpty) {
+      final digits = phone!.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits.isNotEmpty) {
+        return digits[0];
+      }
+    }
+    
+    // Запасной вариант - безопасный
+    return 'U';
+  }
+
+  // Короткое имя для отображения в аватаре
+  String get shortName {
+    return initials;
+  }
+
+  // Цвет для дефолтного аватара на основе ID
+  Color get avatarColor {
+    final colors = [
+      Colors.blue.shade700,
+      Colors.green.shade700,
+      Colors.orange.shade700,
+      Colors.purple.shade700,
+      Colors.red.shade700,
+      Colors.teal.shade700,
+      Colors.indigo.shade700,
+      Colors.pink.shade700,
+      Colors.brown.shade700,
+      Colors.cyan.shade700,
+      Colors.deepOrange.shade700,
+      Colors.lime.shade700,
+    ];
+    return colors[id % colors.length];
+  }
+
   String get displayName {
     // 1. Проверяем никнейм
     if (nickname != null && nickname!.isNotEmpty) {
@@ -93,30 +211,9 @@ class User {
       'lastName': lastName,
       'nickname': nickname,
       'displayName': displayName,
+      'hasAvatar': hasAvatar,
+      'avatarUrl': avatarUrl,
     };
-  }
-
-
-  String get shortName {
-    if (nickname != null && nickname!.isNotEmpty) {
-      return nickname![0].toUpperCase();
-    }
-    
-    if (firstName != null && firstName!.isNotEmpty) {
-      return firstName![0].toUpperCase();
-    }
-    
-    if (lastName != null && lastName!.isNotEmpty) {
-      return lastName![0].toUpperCase();
-    }
-    
-    return 'U';
-  }
-
-  String? get avatarUrl {
-    if (avatar == null || avatar!.isEmpty || avatar == 'false') return null;
-    if (avatar!.startsWith('http')) return avatar;
-    return '${ApiConfig.uploadsUrl}/$avatar';
   }
 
   // Для создания пустого пользователя
