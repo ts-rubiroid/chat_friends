@@ -5,12 +5,10 @@ import 'package:chat_friends/screens/chats_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-
-// URL для обновления (должен совпадать с main.dart)
-const String _updateUrl = 'https://ВАШ_САЙТ.ru/update';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -25,6 +23,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String _error = '';
   bool _checkingUpdate = false;
   String _updateStatus = '';
+  String? _downloadedApkPath;
+  String? _latestVersion;
 
   void _login() async {
     if (_formKey.currentState!.validate()) {
@@ -61,57 +61,49 @@ class _LoginScreenState extends State<LoginScreen> {
     _login();
   }
 
-  // Функция ручной проверки обновлений
   Future<void> _manualCheckUpdate() async {
     setState(() {
       _checkingUpdate = true;
       _updateStatus = 'Проверяем обновления...';
+      _downloadedApkPath = null;
     });
 
     try {
-      // 1. Получаем текущую версию приложения
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      int currentVersion = int.parse(packageInfo.version.replaceAll('.', ''));
+      final currentVersion = packageInfo.version;
       
-      // 2. Получаем версию с сервера
-      final response = await http.get(Uri.parse('$_updateUrl/version.txt'));
+      final updateUrl = 'https://chatnews.remont-gazon.ru/update/update.json';
+      final response = await http.get(Uri.parse(updateUrl));
       
       if (response.statusCode == 200) {
-        String serverVersionText = response.body.trim();
-        int latestVersion = int.parse(serverVersionText.replaceAll('.', ''));
-
-        if (latestVersion > currentVersion) {
+        final data = jsonDecode(response.body);
+        final latestVersion = data['latest_version'];
+        final apkUrl = data['apk_url'];
+        _latestVersion = latestVersion;
+        
+        if (latestVersion != currentVersion) {
           setState(() {
-            _updateStatus = 'Найдена новая версия! Скачиваем...';
+            _updateStatus = 'Найдена версия $latestVersion! Скачиваем...';
           });
           
-          // Запрашиваем разрешение
-          var status = await Permission.manageExternalStorage.request();
+          await _downloadApk(apkUrl);
           
-          if (status.isGranted) {
-            // Скачиваем и устанавливаем APK
-            await _downloadAndInstallApk();
-            setState(() {
-              _updateStatus = 'Обновление скачано! Откройте файл для установки.';
-            });
-          } else {
-            setState(() {
-              _updateStatus = 'Нужно разрешение на установку';
-            });
-          }
+          setState(() {
+            _updateStatus = 'Готово к установке';
+          });
         } else {
           setState(() {
-            _updateStatus = 'У вас актуальная версия';
+            _updateStatus = 'У вас актуальная версия $currentVersion ✓';
           });
         }
       } else {
         setState(() {
-          _updateStatus = 'Ошибка соединения: ${response.statusCode}';
+          _updateStatus = 'Ошибка соединения с сервером';
         });
       }
     } catch (e) {
       setState(() {
-        _updateStatus = 'Ошибка: $e';
+        _updateStatus = 'Ошибка: ${e.toString()}';
       });
     } finally {
       setState(() {
@@ -120,28 +112,114 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Функция скачивания и установки APK
-  Future<void> _downloadAndInstallApk() async {
+  Future<void> _downloadApk(String apkUrl) async {
     try {
-      // 1. Скачиваем APK
-      var response = await http.get(Uri.parse('$_updateUrl/app.apk'));
+      var response = await http.get(Uri.parse(apkUrl));
       
-      // 2. Сохраняем в папку Downloads
-      Directory? downloadsDir = await getExternalStorageDirectory();
-      if (downloadsDir == null) return;
-      
-      String downloadsPath = '${downloadsDir.path}/Downloads';
-      await Directory(downloadsPath).create(recursive: true);
-      
-      String apkPath = '$downloadsPath/chat_friends_update.apk';
+      Directory tempDir = await getTemporaryDirectory();
+      String apkPath = '${tempDir.path}/chat_friends_${_latestVersion}.apk';
       File apkFile = File(apkPath);
       await apkFile.writeAsBytes(response.bodyBytes);
       
-      // 3. Открываем APK для установки
-      await OpenFilex.open(apkPath);
+      setState(() {
+        _downloadedApkPath = apkPath;
+      });
     } catch (e) {
-      print('Ошибка при установке обновления: $e');
+      setState(() {
+        _updateStatus = 'Ошибка скачивания: ${e.toString()}';
+      });
     }
+  }
+
+  Future<void> _installApk() async {
+    if (_downloadedApkPath == null || !File(_downloadedApkPath!).existsSync()) {
+      setState(() {
+        _updateStatus = 'APK не найден, проверьте обновление снова';
+      });
+      return;
+    }
+
+    try {
+      var status = await Permission.manageExternalStorage.request();
+      if (!status.isGranted) {
+        setState(() {
+          _updateStatus = 'Нужно разрешение на установку';
+        });
+        return;
+      }
+      
+      final result = await OpenFilex.open(_downloadedApkPath!);
+      print('Результат открытия файла: $result');
+    } catch (e) {
+      setState(() {
+        _updateStatus = 'Ошибка установки: ${e.toString()}';
+      });
+    }
+  }
+
+  Widget _buildUpdateStatus() {
+    if (_updateStatus.isEmpty) return SizedBox();
+    
+    if (_downloadedApkPath != null && _updateStatus == 'Готово к установке') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: GestureDetector(
+          onTap: _installApk,
+          child: Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.system_update, color: Colors.blue),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Обновление скачано!',
+                        style: TextStyle(
+                          color: Colors.blue[800],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Нажмите здесь чтобы установить версию $_latestVersion',
+                        style: TextStyle(
+                          color: Colors.blue[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward, color: Colors.blue),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Text(
+        _updateStatus,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: _updateStatus.contains('Ошибка') 
+              ? Colors.red 
+              : _updateStatus.contains('актуальная')
+                ? Colors.green
+                : Colors.blue,
+        ),
+      ),
+    );
   }
 
   @override
@@ -222,7 +300,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Text('Регистрация'),
               ),
               
-              // Кнопка проверки обновлений
               SizedBox(height: 30),
               Divider(),
               SizedBox(height: 10),
@@ -233,27 +310,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               SizedBox(height: 10),
               
-              if (_updateStatus.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Text(
-                    _updateStatus,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _updateStatus.contains('Ошибка') 
-                          ? Colors.red 
-                          : _updateStatus.contains('актуальная')
-                            ? Colors.green
-                            : Colors.blue,
-                    ),
-                  ),
-                ),
+              _buildUpdateStatus(),
               
               _checkingUpdate
                   ? Center(child: CircularProgressIndicator())
-                  : OutlinedButton(
+                  : OutlinedButton.icon(
                       onPressed: _manualCheckUpdate,
-                      child: Text('Проверить обновление'),
+                      icon: Icon(Icons.system_update),
+                      label: Text('Проверить обновление'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: Size(double.infinity, 45),
                       ),
