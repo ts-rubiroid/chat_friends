@@ -30,6 +30,8 @@ git reset --hard 50a84bff47fae6e3d4d380a6b0232f07cfb322b5
 
 ###################
 
+https://chatnews.remont-gazon.ru/update/version.txt
+
 
 
 ########################
