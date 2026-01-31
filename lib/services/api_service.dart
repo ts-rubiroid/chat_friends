@@ -88,42 +88,66 @@ class ApiService {
       String phone, String password, Map<String, dynamic> userData) async {
     final url = Uri.parse(ApiConfig.registerEndpoint);
     
-    final body = {
+    // Правильная подготовка данных
+    final Map<String, dynamic> body = {
       'phone': phone.trim(),
       'password': password.trim(),
       'first_name': (userData['first_name'] ?? '').trim(),
       'last_name': (userData['last_name'] ?? '').trim(),
       'nickname': (userData['nickname'] ?? '').trim(),
+      'avatar': (userData['avatar'] ?? '').trim(),
     };
 
+    // Добавляем middle_name если есть
     final middleName = (userData['middle_name'] ?? '').trim();
     if (middleName.isNotEmpty) {
       body['middle_name'] = middleName;
     }
 
-    ApiConfig.logRequest('POST', url.toString(), body: body);
-    
+    // DEBUG
+    print('[API] Регистрация пользователя:');
+    print('  URL: $url');
+    print('  Данные: $body');
+
     try {
+      // Делаем простой запрос без сложной обработки
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Accept': 'application/json',
+        },
         body: json.encode(body),
       );
 
-      final result = await _handleResponse(response);
+      print('[API] Ответ сервера: ${response.statusCode}');
+      print('[API] Тело ответа: ${response.body}');
+
+      // Прямой парсинг без _handleResponse
+      final Map<String, dynamic> result = json.decode(response.body);
       
-      final token = result['token'];
-      if (token != null && token is String) {
-        await saveToken(token);
-        print('[API] Токен сохранен после регистрации: ${token.substring(0, min(20, token.length))}...');
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final token = result['token'];
+        if (token != null && token is String) {
+          await saveToken(token);
+          print('[API] Токен сохранен');
+        }
+        return result;
       } else {
-        print('[API] Внимание: токен не найден в ответе регистрации');
+        // Возвращаем ошибку как есть
+        return {
+          'success': false,
+          'error': result['message'] ?? 'Ошибка регистрации',
+          'statusCode': response.statusCode
+        };
       }
       
-      return result;
     } catch (e) {
-      print('[API] Ошибка регистрации: $e');
-      rethrow;
+      print('[API] Критическая ошибка регистрации: $e');
+      return {
+        'success': false,
+        'error': 'Сетевая ошибка: $e'
+      };
     }
   }
 
@@ -620,30 +644,41 @@ class ApiService {
 
   // === ЗАГРУЗКА ФАЙЛОВ ===
 
-  static Future<String> uploadAvatar(File imageFile) async {
-    final token = await getToken();
-    if (token == null) throw Exception('Требуется авторизация');
-
-    final url = Uri.parse(ApiConfig.uploadAvatarEndpoint);
-    
-    var request = http.MultipartRequest('POST', url);
-    request.headers['Authorization'] = 'Bearer $token';
-    
-    var multipartFile = await http.MultipartFile.fromPath(
-      'avatar',
-      imageFile.path,
-      filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.${imageFile.path.split('.').last}',
-    );
-    request.files.add(multipartFile);
-    
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    
-    if (response.statusCode >= 200 && response.statusCode < 300) {
+  static Future<String?> uploadAvatar(File imageFile) async {
+    try {
+      print('📤 Загрузка аватара БЕЗ токена...');
+      
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConfig.baseUrl}/wp-json/chat-api/v1/upload'),
+      );
+      
+      // БЕЗ заголовка Authorization!
+      
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        imageFile.path,
+        filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      ));
+      
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
       final result = json.decode(responseBody);
-      return result['url'] ?? result['file_url'] ?? result['data']['url'];
-    } else {
-      throw Exception('Ошибка загрузки: $responseBody');
+      
+      print('📥 Ответ: ${response.statusCode}');
+      
+      if (response.statusCode == 200 && result['success'] == true) {
+        final url = result['file']['url'];
+        print('✅ Аватар загружен: $url');
+        return url;
+      } else {
+        print('❌ Ошибка: ${result['message']}');
+        return null;
+      }
+      
+    } catch (e) {
+      print('❌ Ошибка загрузки: $e');
+      return null;
     }
   }
 }

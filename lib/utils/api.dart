@@ -37,7 +37,7 @@ class ApiConfig {
   static const String sendMessageEndpoint = '$chatApi/messages/send';
   
   // Загрузка файлов
-  static const String uploadAvatarEndpoint = '$chatApi/upload/avatar';
+  static const String uploadEndpoint = '$chatApi/upload';  // ← ТОЧНО как в WordPress
   
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ДЛЯ ПОСТРОЕНИЯ URL ===
   static String chatDetailEndpoint(int chatId) => '$chatsEndpoint/$chatId';

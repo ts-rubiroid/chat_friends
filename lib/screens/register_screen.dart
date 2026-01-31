@@ -33,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+
   void _register() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -41,44 +42,77 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       try {
-        // Подготавливаем данные в правильном формате
+        String? avatarUrl;
+        
+        // 1. Загружаем аватар
+        if (_avatar != null) {
+          print('Загружаю аватар...');
+          avatarUrl = await ApiService.uploadAvatar(_avatar!);
+          
+          if (avatarUrl == null) {
+            print('Аватар не загружен, продолжаем без него');
+          }
+        }
+        
+        // 2. Подготавливаем данные
         final data = {
           'first_name': _firstNameController.text.trim(),
           'last_name': _lastNameController.text.trim(),
-          'middle_name': _middleNameController.text.trim(),
           'nickname': _nicknameController.text.isNotEmpty 
               ? _nicknameController.text.trim()
-              : _firstNameController.text.trim(), // если ник не указан, используем имя
+              : _firstNameController.text.trim(),
+          'avatar': avatarUrl ?? '', // URL или пустая строка
         };
 
-        // Регистрируем пользователя
-        await ApiService.register(
+        // 3. Регистрируем пользователя
+        print('Регистрирую...');
+        final registerResponse = await ApiService.register(
           _phoneController.text.trim(),
           _passwordController.text.trim(),
           data,
         );
         
-        // После успешной регистрации сразу логинимся
-        await ApiService.login(
-          _phoneController.text.trim(),
-          _passwordController.text.trim(),
-        );
+        print('Ответ регистрации: $registerResponse');
         
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => ChatsScreen()),
-        );
-      } catch (e) {
-        setState(() {
-          // Выводим понятное сообщение об ошибке
-          if (e.toString().contains('first_name') || e.toString().contains('firet_name')) {
-            _error = 'Поле "Имя" обязательно для заполнения';
-          } else if (e.toString().contains('phone')) {
-            _error = 'Поле "Телефон" обязательно или неверный формат';
+        // 4. Проверяем успех
+        if (registerResponse['success'] == true) {
+          print('✓ Регистрация успешна!');
+          
+          // 5. Авторизуемся
+          final loginResponse = await ApiService.login(
+            _phoneController.text.trim(),
+            _passwordController.text.trim(),
+          );
+          
+          if (loginResponse['success'] == true) {
+            print('✓ Авторизация успешна!');
+            
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => ChatsScreen()),
+            );
           } else {
-            _error = 'Ошибка регистрации: ${e.toString()}';
+            throw Exception('Ошибка авторизации');
           }
+        } else {
+          // Ошибка регистрации
+          final errorMsg = registerResponse['message'] ?? registerResponse['error'] ?? 'Ошибка регистрации';
+          throw Exception(errorMsg);
+        }
+        
+      } catch (e) {
+        print('Ошибка: $e');
+        setState(() {
+          _error = e.toString();
         });
+        
+        // Показываем Snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_error),
+            backgroundColor: Colors.red,
+          ),
+        );
       } finally {
         setState(() {
           _isLoading = false;
@@ -86,6 +120,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
   }
+
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
