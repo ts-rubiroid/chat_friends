@@ -251,24 +251,68 @@ class ChatListItem extends StatelessWidget {
     }
   }
 
+
   Widget _buildSubtitle(User? otherUser, User? displayCreator) {
     if (chat.isGroup) {
-      // Групповой чат
+      // Групповой чат - ВЫВОДИМ СПИСОК ИМЕН УЧАСТНИКОВ + создателя
+      final participantsNames = _getParticipantsNames();
       final creatorName = displayCreator?.displayName ?? 'Неизвестно';
-      final memberCount = _getGroupMemberCount();
-      final countText = _getParticipantsText(memberCount);
       
-      return Text(
-        'Создал: $creatorName, $countText',
-        style: TextStyle(
-          color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
-          fontSize: 12,
-        ),
-        overflow: TextOverflow.ellipsis,
-        maxLines: 1,
-      );
+      if (participantsNames.isNotEmpty) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Создан: $creatorName',
+              style: TextStyle(
+                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                fontSize: 11, // Меньший размер для создателя
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            SizedBox(height: 2),
+            Text(
+              participantsNames,
+              style: TextStyle(
+                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
+        );
+      } else {
+        // Если не удалось получить имена участников
+        final memberCount = _getGroupMemberCount();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Создан: $creatorName',
+              style: TextStyle(
+                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                fontSize: 11,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            SizedBox(height: 2),
+            Text(
+              '${memberCount} участник(ов)',
+              style: TextStyle(
+                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                fontSize: 12,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
+        );
+      }
     } else {
-      // Личный чат
+      // Личный чат - оставляем как было
       final messagePreview = chat.getLastMessagePreview();
       return Text(
         messagePreview,
@@ -282,6 +326,7 @@ class ChatListItem extends StatelessWidget {
       );
     }
   }
+
 
   Widget _buildTrailing() {
     return Column(
@@ -373,27 +418,90 @@ class ChatListItem extends StatelessWidget {
     return 0;
   }
 
-  String _getParticipantsText(int count) {
-    if (count == 0) return 'нет участников';
-    
-    final lastDigit = count % 10;
-    final lastTwoDigits = count % 100;
-    
-    if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
-      return '$count участников';
-    }
-    
-    switch (lastDigit) {
-      case 1:
-        return '$count участник';
-      case 2:
-      case 3:
-      case 4:
-        return '$count участника';
-      default:
-        return '$count участников';
+
+  String _getParticipantsNames() {
+
+  print('[DEBUG] Получаем имена участников для чата ${chat.id}');
+  print('[DEBUG] Всего участников: ${chat.members?.length ?? 0}');
+  if (chat.members != null) {
+    for (var member in chat.members!) {
+      print('[DEBUG] Участник: ID=${member.id}, Nickname="${member.nickname}", DisplayName="${member.displayName}"');
     }
   }
+
+
+
+
+
+    if (!chat.isGroup || chat.members == null || chat.members!.isEmpty) {
+      return '';
+    }
+    
+    try {
+      // Получаем список участников, исключая текущего пользователя
+      final otherMembers = chat.members!
+          .where((member) => member.id != currentUser.id)
+          .toList();
+      
+      // Если только текущий пользователь в чате
+      if (otherMembers.isEmpty) {
+        return 'Только вы';
+      }
+      
+      // Ограничиваем до 3-х имен для компактности
+      final maxNames = 3;
+      final limitedMembers = otherMembers.take(maxNames).toList();
+      
+      // Собираем имена
+      final names = limitedMembers.map((member) {
+        // Используем nickname, displayName или firstName
+        return member.nickname?.isNotEmpty == true
+            ? member.nickname!
+            : member.displayName.isNotEmpty
+                ? member.displayName
+                : member.firstName ?? 'Пользователь';
+      }).toList();
+      
+      String result = names.join(', ');
+      
+      // Если участников больше, добавляем "и X еще"
+      if (otherMembers.length > maxNames) {
+        final remaining = otherMembers.length - maxNames;
+        result += ' и ещё $remaining';
+        
+        // Склонение для "ещё"
+        final lastDigit = remaining % 10;
+        final lastTwoDigits = remaining % 100;
+        
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 19) {
+          result += ' участников';
+        } else {
+          switch (lastDigit) {
+            case 1:
+              result += ' участник';
+              break;
+            case 2:
+            case 3:
+            case 4:
+              result += ' участника';
+              break;
+            default:
+              result += ' участников';
+          }
+        }
+      } else if (otherMembers.length == 1) {
+        result += ' (1 участник)';
+      } else {
+        result += ' (${otherMembers.length} участника)';
+      }
+      
+      return result;
+    } catch (e) {
+      print('Ошибка получения имен участников: $e');
+      return '';
+    }
+  }
+
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();

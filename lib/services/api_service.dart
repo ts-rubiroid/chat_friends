@@ -276,9 +276,12 @@ class ApiService {
       return chatsData.map((json) => Chat.fromJson(json)).toList();
     } catch (e) {
       print('[ERROR] Ошибка получения чатов: $e');
-      return []; // Возвращаем пустой список вместо ошибки
+      return [];
     }
   }
+
+
+
 
   static Future<Chat> getChatDetail(int chatId) async {
     final headers = await _getHeaders();

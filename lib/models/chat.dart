@@ -31,6 +31,15 @@ class Chat {
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) {
+    
+      // ДОБАВЬТЕ ЛОГИРОВАНИЕ
+    print('[CHAT DEBUG] Парсинг чата ID: ${json['id']}');
+    print('[CHAT DEBUG] unread_count из JSON: ${json['unread_count']} (тип: ${json['unread_count']?.runtimeType})');
+    print('[CHAT DEBUG] unreadCount из JSON: ${json['unreadCount']} (тип: ${json['unreadCount']?.runtimeType})');  
+    
+    
+    
+    
     // Парсим участников
     List<User>? members;
     if (json['members'] != null && json['members'] is List) {
@@ -97,13 +106,32 @@ class Chat {
   }
 
   static int _parseInt(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is String) {
-      if (value == 'null' || value.isEmpty) return 0;
-      return int.tryParse(value) ?? 0;
+    print('[PARSE INT DEBUG] Входное значение: $value (тип: ${value?.runtimeType})');
+    
+    if (value == null) {
+      print('[PARSE INT DEBUG] Возвращаю 0 (null)');
+      return 0;
     }
-    if (value is bool) return value ? 1 : 0;
+    if (value is int) {
+      print('[PARSE INT DEBUG] Возвращаю $value (int)');
+      return value;
+    }
+    if (value is String) {
+      if (value == 'null' || value.isEmpty) {
+        print('[PARSE INT DEBUG] Возвращаю 0 (пустая строка)');
+        return 0;
+      }
+      final parsed = int.tryParse(value) ?? 0;
+      print('[PARSE INT DEBUG] Парсинг строки "$value" -> $parsed');
+      return parsed;
+    }
+    if (value is bool) {
+      final result = value ? 1 : 0;
+      print('[PARSE INT DEBUG] Парсинг bool $value -> $result');
+      return result;
+    }
+    
+    print('[PARSE INT DEBUG] Возвращаю 0 (неизвестный тип)');
     return 0;
   }
 

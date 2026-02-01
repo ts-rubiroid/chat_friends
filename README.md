@@ -431,3 +431,421 @@ flutter:
 Прикрепил Документацию по WP API и Flutter Приложению.
 
 Какие сей час еще прислать файлы?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##############################################################################
+
+
+
+Ты: - Senior разработчик веб-приложений и специалист по созданию корпоративных чатов для общения узкого круга пользователей и интеграции этих чатов по API с сервисом BeGet. Ты в совершенстве владеешь flutter, Dart, JS, PHP, WordPress и API внедрениями.
+
+КОНТЕКСТ ПРОЕКТА: Разрабатываем корпоративный чат "Чат Друзей" с Flutter frontend и WordPress backend.
+
+ТЕКУЩЕЕ СОСТОЯНИЕ:
+
+✅ Продакшен-готовый WordPress backend с Custom Post Types: chat_user, chat, chat_message
+
+✅ Полный REST API протестирован и работает
+
+✅ Аутентификация (логин/регистрация) с токенами формата user_{id}_{hash}
+
+✅ Загрузка аватаров при регистрации работает
+
+✅ Создание личных и групповых чатов
+
+✅ Отправка/получение сообщений
+
+✅ Аватары пользователей отображаются в чатах
+
+СТРУКТУРА FLUTTER ПРОЕКТА:
+
+text
+lib/
+├── main.dart
+├── utils/api.dart
+├── services/api_service.dart
+├── models/
+│   ├── user.dart
+│   ├── chat.dart
+│   └── message.dart
+└── screens/
+    ├── login_screen.dart
+    ├── register_screen.dart
+    ├── chats_screen.dart      # Текущий экран списка чатов
+    ├── chat_screen.dart
+    ├── create_chat_screen.dart
+    └── profile_screen.dart
+ТЕКУЩАЯ ЗАДАЧА: Усовершенствование экрана списка чатов
+
+ЗАДАЧИ:
+
+Разделить список чатов на 2 вкладки: "Личные" и "Групповые"
+
+Для групповых чатов: вместо количества участников выводить список никнеймов/имен участников (мелкими именами под названием чата)
+
+Экран группового чата: добавить вверху список всех участников группы с возможностью удалять/добавлять участников (меню с чекбоксами всех пользователей)
+
+Непрочитанные сообщения: выделять чаты с непрочитанными сообщениями ярким зеленым индикатором
+
+ЧТО УЖЕ РАБОТАЕТ В chats_screen.dart:
+
+Отображение списка чатов (личных и групповых)
+
+Сортировка по последнему сообщению
+
+Pull-to-refresh
+
+Навигация в чат
+
+Отображение аватаров
+
+API ENDPOINTS (WordPress):
+
+GET /chat-api/v1/chats - список всех чатов пользователя (возвращает поле members с массивами участников)
+
+GET /chat-api/v1/users - все пользователи
+
+POST /chat-api/v1/chats/{id}/add-members - добавить участников
+
+POST /chat-api/v1/chats/{id}/remove-member - удалить участника
+
+НУЖНЫЕ ФАЙЛЫ ДЛЯ НАЧАЛА:
+
+lib/screens/chats_screen.dart - текущая реализация списка чатов
+
+lib/models/chat.dart - модель Chat для понимания структуры
+
+lib/widgets/chat_list_item.dart - виджет элемента списка чатов
+
+lib/services/api_service.dart - методы API для работы с чатами
+
+ТЕСТОВЫЕ ДАННЫЕ:
+
+Сервер: https://chat.remont-gazon.ru/
+
+Токен: user_259_e7f4d02c3f703f50ca87d790133e04f8
+
+Пользователь ID: 259
+
+ПРИНЦИП РАБОТЫ:
+
+Ты присылаешь ОДИН шаг: файл + полный код + инструкции
+
+Я выполняю, тестирую, сообщаю результат
+
+Только реальный проверенный код, без костылей
+
+Точно и полностью пиши полные пути, фрагменты и названия
+
+Не фантаируй, лиь бы угодить мне.
+
+Проверяй трижды код перед тем как прислать.
+
+Присылай только реальный, проверенный, работающий код.
+
+Перед тем как вносить изменения, запрашивай нужные, не знакомые файлы проекта на анализ.
+
+Начинаем с задачи №1: Разделение списка чатов на вкладки "Личные" и "Групповые". Пришли текущий chats_screen.dart.КОНТЕКСТ ПРОЕКТА: Разрабатываем корпоративный чат "Чат Друзей" с Flutter frontend и WordPress backend.
+
+ТЕКУЩЕЕ СОСТОЯНИЕ:
+
+✅ Продакшен-готовый WordPress backend с Custom Post Types: chat_user, chat, chat_message
+
+✅ Полный REST API протестирован и работает
+
+✅ Аутентификация (логин/регистрация) с токенами формата user_{id}_{hash}
+
+✅ Загрузка аватаров при регистрации работает
+
+✅ Создание личных и групповых чатов
+
+✅ Отправка/получение сообщений
+
+✅ Аватары пользователей отображаются в чатах
+
+СТРУКТУРА FLUTTER ПРОЕКТА:
+
+text
+lib/
+├── main.dart
+├── utils/api.dart
+├── services/api_service.dart
+├── models/
+│   ├── user.dart
+│   ├── chat.dart
+│   └── message.dart
+└── screens/
+    ├── login_screen.dart
+    ├── register_screen.dart
+    ├── chats_screen.dart      # Текущий экран списка чатов
+    ├── chat_screen.dart
+    ├── create_chat_screen.dart
+    └── profile_screen.dart
+ТЕКУЩАЯ ЗАДАЧА: Усовершенствование экрана списка чатов
+
+ЗАДАЧИ:
+
+Разделить список чатов на 2 вкладки: "Личные" и "Групповые"
+
+Для групповых чатов: вместо количества участников выводить список никнеймов/имен участников (мелкими именами под названием чата)
+
+Экран группового чата: добавить вверху список всех участников группы с возможностью удалять/добавлять участников (меню с чекбоксами всех пользователей)
+
+Непрочитанные сообщения: выделять чаты с непрочитанными сообщениями ярким зеленым индикатором
+
+ЧТО УЖЕ РАБОТАЕТ В chats_screen.dart:
+
+Отображение списка чатов (личных и групповых)
+
+Сортировка по последнему сообщению
+
+Pull-to-refresh
+
+Навигация в чат
+
+Отображение аватаров
+
+API ENDPOINTS (WordPress):
+
+GET /chat-api/v1/chats - список всех чатов пользователя (возвращает поле members с массивами участников)
+
+GET /chat-api/v1/users - все пользователи
+
+POST /chat-api/v1/chats/{id}/add-members - добавить участников
+
+POST /chat-api/v1/chats/{id}/remove-member - удалить участника
+
+Вот список работающих ендпоинтов  из Документации :
+
+{
+  "success": true,
+  "message": "Chat API v3.0 работает со всеми функциями",
+  "timestamp": "2026-01-31 15:49:41",
+  "version": "3.0",
+  "endpoints": {
+    "/chat-api/v1/test": "GET - Тест API",
+    "/chat-api/v1/chats": "GET - Список чатов",
+    "/chat-api/v1/chats/{id}": "GET - Информация о чате",
+    "/chat-api/v1/chats/create": "POST - Создать чат",
+    "/chat-api/v1/chats/{id}/add-members": "POST - Добавить участников",
+    "/chat-api/v1/chats/{id}/update": "POST - Обновить чат",
+    "/chat-api/v1/chats/{id}/remove-member": "POST - Удалить участника",
+    "/chat-api/v1/chats/{id}/delete": "POST - Удалить чат",
+    "/chat-api/v1/chats/{id}/creator": "GET - Создатель чата",
+    "/chat-api/v1/messages": "GET - Сообщения чата",
+    "/chat-api/v1/messages/send": "POST - Отправить сообщение",
+    "/chat-api/v1/messages/mark-read": "POST - Отметить прочитанными",
+    "/chat-api/v1/messages/unread-count": "GET - Непрочитанные",
+    "/chat-api/v1/messages/search": "GET - Поиск сообщений",
+    "/chat-api/v1/users": "GET - Все пользователи",
+    "/chat-api/v1/me": "GET - Текущий пользователь",
+    "/chat-api/v1/upload": "POST - Загрузить файл"
+  }
+}
+
+
+НУЖНЫЕ ФАЙЛЫ ДЛЯ НАЧАЛА:
+
+lib/screens/chats_screen.dart - текущая реализация списка чатов
+
+lib/models/chat.dart - модель Chat для понимания структуры
+
+lib/widgets/chat_list_item.dart - виджет элемента списка чатов
+
+lib/services/api_service.dart - методы API для работы с чатами
+
+ТЕСТОВЫЕ ДАННЫЕ:
+
+Сервер: https://chat.remont-gazon.ru/
+
+Токен: user_259_e7f4d02c3f703f50ca87d790133e04f8
+
+Пользователь ID: 259
+
+ПРИНЦИП РАБОТЫ:
+
+Стремись к простоте при генерации кода.
+
+Не надо длинных рассуждений в сообщениях - пиши коротко и понятно, без "воды"
+
+Ты присылаешь ОДИН шаг: файл + полный код + инструкции
+
+Я выполняю, тестирую, сообщаю результат
+
+Только реальный проверенный код, без костылей
+
+Точно пиши полные пути, фрагменты и названия
+
+Начинаем с задачи №1: Разделение списка чатов на вкладки "Личные" и "Групповые".
+
+ Вот текущий chats_screen.dart. Тчательно проанализируй его на ошибки и укажи как исправить, если найдеь! Код работающий. Важно не повредить его работоспособность!
+
+ import 'package:flutter/material.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'package:chat_friends/services/api_service.dart';
+import 'package:chat_friends/models/chat.dart';
+import 'package:chat_friends/models/user.dart';
+import 'package:chat_friends/widgets/chat_list_item.dart';
+import 'package:chat_friends/screens/chat_screen.dart';
+import 'package:chat_friends/screens/create_chat_screen.dart';
+import 'package:chat_friends/screens/profile_screen.dart';
+
+class ChatsScreen extends StatefulWidget {
+  @override
+  _ChatsScreenState createState() => _ChatsScreenState();
+}
+
+class _ChatsScreenState extends State<ChatsScreen> {
+  List<Chat> _chats = [];
+  List<User> _allUsers = [];
+  User? _currentUser;
+  bool _isLoading = true;
+  final RefreshController _refreshController = RefreshController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final chats = await ApiService.getChats();
+      final allUsers = await ApiService.getAllUsers();
+      final currentUser = await ApiService.getCurrentUser();
+      
+      chats.sort((a, b) {
+        if (a.hasUnread && !b.hasUnread) return -1;
+        if (!a.hasUnread && b.hasUnread) return 1;
+        
+        final aTime = a.lastMessage?.createdAt ?? a.createdAt ?? DateTime(1970);
+        final bTime = b.lastMessage?.createdAt ?? b.createdAt ?? DateTime(1970);
+        return bTime.compareTo(aTime);
+      });
+
+      setState(() {
+        _chats = chats;
+        _allUsers = allUsers;
+        _currentUser = currentUser;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Ошибка загрузки данных: $e');
+      setState(() { _isLoading = false; });
+    }
+  }
+
+  void _onRefresh() async {
+    await _loadData();
+    _refreshController.refreshCompleted();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Чаты'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.person),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProfileScreen()),
+              ).then((_) => _loadData());
+            },
+          ),
+        ],
+      ),
+      body: _isLoading || _currentUser == null
+          ? Center(child: CircularProgressIndicator())
+          : SmartRefresher(
+              controller: _refreshController,
+              onRefresh: _onRefresh,
+              child: _chats.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'Нет чатов',
+                            style: TextStyle(fontSize: 18, color: Colors.grey),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Создайте первый чат',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _chats.length,
+                      itemBuilder: (context, index) {
+                        final chat = _chats[index];
+                        return ChatListItem(
+                          chat: chat,
+                          currentUser: _currentUser!,
+                          allUsers: _allUsers,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(chat: chat),
+                              ),
+                            ).then((_) => _loadData());
+                          },
+                        );
+                      },
+                    ),
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          // ОТКРЫВАЕМ ЭКРАН СОЗДАНИЯ И ЖДЕМ РЕЗУЛЬТАТ
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CreateChatScreen()),
+          );
+          
+          // ЕСЛИ ВЕРНУЛСЯ СОЗДАННЫЙ ЧАТ - ОТКРЫВАЕМ ЕГО
+          if (result is Chat) {
+            print('[DEBUG] Получен созданный чат: ${result.id}');
+            await _loadData(); // Обновляем список
+            
+            // НЕМНОГО ЖДЕМ, ЧТОБЫ СПИСОК ОБНОВИЛСЯ
+            await Future.delayed(Duration(milliseconds: 300));
+            
+            // ОТКРЫВАЕМ СОЗДАННЫЙ ЧАТ
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(chat: result),
+              ),
+            ).then((_) => _loadData());
+          } 
+          // ЕСЛИ ЧАТ НЕ БЫЛ СОЗДАН (null) - ПРОСТО ОБНОВЛЯЕМ СПИСОК
+          else if (result == null) {
+            _loadData();
+          }
+        },
+        child: Icon(Icons.add),
+      ),
+    );
+  }
+}
+

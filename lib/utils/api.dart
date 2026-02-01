@@ -13,6 +13,7 @@ class ApiConfig {
 
   // === API NAMESPACES (согласно документации) ===
   static const String authApi = '$apiBase/chat/v1/auth';
+  
   static const String chatApi = '$apiBase/chat-api/v1';
 
   // === АУТЕНТИФИКАЦИЯ (authApi) ===
