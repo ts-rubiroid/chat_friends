@@ -94,6 +94,7 @@ text
 ChatScreen → text/file → 
 ├── Текст → ApiService.sendTextMessage()
 └── Файл → ApiService.uploadFile() → sendTextMessage(file_url: ...)
+
 📊 Тестовые данные WP
 dart
 phone: '+79161234567'
@@ -101,6 +102,7 @@ password: '123456'
 token: 'user_259_e7f4d02c3f703f50ca87d790133e04f8'
 chat_id: 260
 user_id: 259
+
 ✅ Что работает сейчас
 ✅ Структура проекта
 

@@ -8,6 +8,7 @@ class ChatListItem extends StatelessWidget {
   final User currentUser;
   final List<User>? allUsers;
   final VoidCallback onTap;
+  final bool? hasUnread; // ← НОВЫЙ ПАРАМЕТР для локального unread
   
   const ChatListItem({
     super.key,
@@ -15,6 +16,7 @@ class ChatListItem extends StatelessWidget {
     required this.currentUser,
     this.allUsers,
     required this.onTap,
+    this.hasUnread, // ← Добавлен в конструктор
   });
 
   @override
@@ -22,6 +24,9 @@ class ChatListItem extends StatelessWidget {
     final otherUser = chat.isGroup ? null : chat.getOtherUser(currentUser, allUsers);
     final isCurrentUserCreator = _isCurrentUserCreator();
     final displayCreator = _getDisplayCreator();
+    
+    // ВАЖНО: Используем локальный hasUnread если передан, иначе серверный
+    final bool showUnreadIndicator = hasUnread ?? chat.hasUnread;
     
     return Container(
       padding: EdgeInsets.symmetric(vertical: 4),
@@ -31,22 +36,23 @@ class ChatListItem extends StatelessWidget {
       ),
       child: ListTile(
         onTap: onTap,
-        leading: _buildAvatar(otherUser, displayCreator),
-        title: _buildTitle(otherUser),
-        subtitle: _buildSubtitle(otherUser, displayCreator),
-        trailing: _buildTrailing(),
+        leading: _buildAvatar(otherUser, displayCreator, showUnreadIndicator),
+        title: _buildTitle(otherUser, showUnreadIndicator),
+        subtitle: _buildSubtitle(otherUser, displayCreator, showUnreadIndicator),
+        trailing: _buildTrailing(showUnreadIndicator),
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         minVerticalPadding: 12,
       ),
     );
   }
 
-  Widget _buildAvatar(User? otherUser, User? displayCreator) {
+  Widget _buildAvatar(User? otherUser, User? displayCreator, bool showUnreadIndicator) {
     // === ОТЛАДОЧНЫЙ КОД ===
     print('══════════════════════════════════════');
     print('🔄 DEBUG AVATAR для чата ID: ${chat.id}');
     print('📝 Название чата: ${chat.name}');
     print('👥 Тип: ${chat.isGroup ? "Групповой" : "Личный"}');
+    print('🔴 Локальный unread статус: $showUnreadIndicator');
     
     if (chat.isGroup) {
       print('👑 Групповой чат');
@@ -176,8 +182,8 @@ class ChatListItem extends StatelessWidget {
                 )
               : _buildFallbackAvatar(fallbackText, fallbackColor),
         ),
-        // Зелёный кружок для непрочитанных
-        if (chat.hasUnread)
+        // Зелёный кружок для непрочитанных - используем локальный статус
+        if (showUnreadIndicator)
           Positioned(
             right: 0,
             top: 0,
@@ -215,15 +221,15 @@ class ChatListItem extends StatelessWidget {
     );
   }
 
-  Widget _buildTitle(User? otherUser) {
+  Widget _buildTitle(User? otherUser, bool showUnreadIndicator) {
     if (chat.isGroup) {
       // ДЛЯ ГРУППОВЫХ: Просто показываем название чата
       return Text(
         chat.name.isNotEmpty ? chat.name : 'Групповой чат',
         style: TextStyle(
-          fontWeight: chat.hasUnread ? FontWeight.bold : FontWeight.normal,
+          fontWeight: showUnreadIndicator ? FontWeight.bold : FontWeight.normal,
           fontSize: 16,
-          color: chat.hasUnread ? Colors.black : Colors.grey[800],
+          color: showUnreadIndicator ? Colors.black : Colors.grey[800],
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
@@ -241,9 +247,9 @@ class ChatListItem extends StatelessWidget {
       return Text(
         title,
         style: TextStyle(
-          fontWeight: chat.hasUnread ? FontWeight.bold : FontWeight.normal,
+          fontWeight: showUnreadIndicator ? FontWeight.bold : FontWeight.normal,
           fontSize: 16,
-          color: chat.hasUnread ? Colors.black : Colors.grey[800],
+          color: showUnreadIndicator ? Colors.black : Colors.grey[800],
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
@@ -251,8 +257,7 @@ class ChatListItem extends StatelessWidget {
     }
   }
 
-
-  Widget _buildSubtitle(User? otherUser, User? displayCreator) {
+  Widget _buildSubtitle(User? otherUser, User? displayCreator, bool showUnreadIndicator) {
     if (chat.isGroup) {
       // Групповой чат - ВЫВОДИМ СПИСОК ИМЕН УЧАСТНИКОВ + создателя
       final participantsNames = _getParticipantsNames();
@@ -265,7 +270,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               'Создан: $creatorName',
               style: TextStyle(
-                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
                 fontSize: 11, // Меньший размер для создателя
               ),
               overflow: TextOverflow.ellipsis,
@@ -275,7 +280,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               participantsNames,
               style: TextStyle(
-                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
                 fontSize: 12,
               ),
               overflow: TextOverflow.ellipsis,
@@ -292,7 +297,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               'Создан: $creatorName',
               style: TextStyle(
-                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
                 fontSize: 11,
               ),
               overflow: TextOverflow.ellipsis,
@@ -302,7 +307,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               '${memberCount} участник(ов)',
               style: TextStyle(
-                color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
                 fontSize: 12,
               ),
               overflow: TextOverflow.ellipsis,
@@ -317,7 +322,7 @@ class ChatListItem extends StatelessWidget {
       return Text(
         messagePreview,
         style: TextStyle(
-          color: chat.hasUnread ? Colors.black87 : Colors.grey[600],
+          color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
           fontSize: 14,
           fontStyle: messagePreview == 'Нет сообщений' ? FontStyle.italic : FontStyle.normal,
         ),
@@ -327,8 +332,7 @@ class ChatListItem extends StatelessWidget {
     }
   }
 
-
-  Widget _buildTrailing() {
+  Widget _buildTrailing(bool showUnreadIndicator) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -342,7 +346,9 @@ class ChatListItem extends StatelessWidget {
             ),
           ),
         SizedBox(height: 4),
-        if (chat.hasUnread && chat.unreadCount > 1)
+        // Показываем счетчик только если есть локальные непрочитанные
+        // (серверный unreadCount игнорируем, так как он всегда 0)
+        if (showUnreadIndicator)
           Container(
             padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
@@ -350,7 +356,7 @@ class ChatListItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              chat.unreadCount > 9 ? '9+' : chat.unreadCount.toString(),
+              '1', // Показываем просто "1" для локальных непрочитанных
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 10,
@@ -418,20 +424,14 @@ class ChatListItem extends StatelessWidget {
     return 0;
   }
 
-
   String _getParticipantsNames() {
-
-  print('[DEBUG] Получаем имена участников для чата ${chat.id}');
-  print('[DEBUG] Всего участников: ${chat.members?.length ?? 0}');
-  if (chat.members != null) {
-    for (var member in chat.members!) {
-      print('[DEBUG] Участник: ID=${member.id}, Nickname="${member.nickname}", DisplayName="${member.displayName}"');
+    print('[DEBUG] Получаем имена участников для чата ${chat.id}');
+    print('[DEBUG] Всего участников: ${chat.members?.length ?? 0}');
+    if (chat.members != null) {
+      for (var member in chat.members!) {
+        print('[DEBUG] Участник: ID=${member.id}, Nickname="${member.nickname}", DisplayName="${member.displayName}"');
+      }
     }
-  }
-
-
-
-
 
     if (!chat.isGroup || chat.members == null || chat.members!.isEmpty) {
       return '';
@@ -501,7 +501,6 @@ class ChatListItem extends StatelessWidget {
       return '';
     }
   }
-
 
   String _formatTime(DateTime time) {
     final now = DateTime.now();

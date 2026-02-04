@@ -27,7 +27,7 @@ flutter build apk --release
 
 
 git reset --hard 50a84bff47fae6e3d4d380a6b0232f07cfb322b5
-
+git reset --hard d474729166af73c2d9e85c86950d31b5f33d4118
 ################### git reset --hard 0fd9f9bde1104e5c2bd1812613deffb7b69f8462
 
 https://chatnews.remont-gazon.ru/update/version.txt

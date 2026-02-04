@@ -1,3 +1,8 @@
+import 'package:chat_friends/utils/local_unread_helper.dart';
+
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
 import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:chat_friends/services/api_service.dart';
@@ -20,11 +25,22 @@ class _ChatsScreenState extends State<ChatsScreen>
   User? _currentUser;
   bool _isLoading = true;
   final RefreshController _refreshController = RefreshController();
-  
+ 
   // Для управления вкладками
   late TabController _tabController;
   List<Chat> _personalChats = [];
   List<Chat> _groupChats = [];
+
+
+  // ЭТИ ПОЛЯ ДЛЯ ЛОКАЛЬНЫХ НЕПРОЧИТАННЫХ
+  // Map<int, int> _lastSeenByChat = {}; // chatId -> lastSeenMessageId
+  Map<int, bool> _hasUnreadByChat = {}; // chatId -> hasUnread
+  bool _hasUnreadPersonal = false;
+  bool _hasUnreadGroup = false;
+
+
+
+
 
   @override
   void initState() {
@@ -74,6 +90,7 @@ class _ChatsScreenState extends State<ChatsScreen>
       final allUsers = await ApiService.getAllUsers();
       final currentUser = await ApiService.getCurrentUser();
       
+      // Старая сортировка (убрать или оставить, но она использует серверный unreadCount)
       chats.sort((a, b) {
         if (a.hasUnread && !b.hasUnread) return -1;
         if (!a.hasUnread && b.hasUnread) return 1;
@@ -91,12 +108,15 @@ class _ChatsScreenState extends State<ChatsScreen>
       });
       
       _categorizeChats();
+      
+      // ДОБАВЬТЕ ЭТУ СТРОКУ: Загружаем локальные статусы непрочитанных
+      await _loadUnreadStatus();
+      
     } catch (e) {
       print('Ошибка загрузки данных: $e');
       setState(() { _isLoading = false; });
     }
   }
-
   void _onRefresh() async {
     await _loadData();
     _refreshController.refreshCompleted();
@@ -138,22 +158,215 @@ class _ChatsScreenState extends State<ChatsScreen>
       itemCount: chats.length,
       itemBuilder: (context, index) {
         final chat = chats[index];
+
+        // ДОБАВЬТЕ ЭТУ ПРОВЕРКУ: Используем локальный статус вместо серверного
+        final hasLocalUnread = _hasUnreadByChat[chat.id] ?? false;
+
         return ChatListItem(
           chat: chat,
           currentUser: _currentUser!,
           allUsers: _allUsers,
+          hasUnread: hasLocalUnread, // ← ПЕРЕДАЕМ ЛОКАЛЬНЫЙ СТАТУС
           onTap: () {
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => ChatScreen(chat: chat),
               ),
-            ).then((_) => _loadData());
+            ).then((_) {
+              // При возврате обновляем данные
+              _loadData();
+            });
           },
         );
       },
     );
   }
+
+
+  /// Загружает состояние для всех чатов и вычисляет непрочитанные
+  Future<void> _loadUnreadStatus() async {
+    try {
+      if (_chats.isEmpty) {
+        print('[LocalUnread] Нет чатов для проверки');
+        return;
+      }
+      
+      print('[LocalUnread] Проверка ${_chats.length} чатов...');
+      
+      final Map<int, bool> hasUnreadMap = {};
+      bool hasUnreadPersonal = false;
+      bool hasUnreadGroup = false;
+      
+      for (final chat in _chats) {
+        // Получаем данные для проверки
+        final currentText = chat.getLastMessagePreview();
+        final lastMessageTime = chat.lastMessage?.createdAt ?? chat.createdAt;
+        
+        // Оцениваем количество сообщений (примерно)
+        int messageCount = 0;
+        if (chat.lastMessage != null) messageCount = 1;
+        if (chat.unreadCount > 0) messageCount = chat.unreadCount + 1;
+        
+        print('  Чат ${chat.id} "${chat.name}":');
+        print('    Текст: "$currentText"');
+        print('    Время: $lastMessageTime');
+        print('    Кол-во сообщений: $messageCount');
+        
+        // Проверяем есть ли непрочитанные
+        final hasUnread = await LocalUnreadHelper.hasUnreadMessages(
+          chatId: chat.id,
+          currentText: currentText,
+          lastMessageTime: lastMessageTime,
+          currentMessageCount: messageCount,
+        );
+        
+        hasUnreadMap[chat.id] = hasUnread;
+        
+        // Обновляем флаги для вкладок
+        if (hasUnread) {
+          if (chat.isGroup) {
+            hasUnreadGroup = true;
+          } else {
+            hasUnreadPersonal = true;
+          }
+        }
+      }
+      
+      // Обновляем состояние
+      if (mounted) {
+        setState(() {
+          _hasUnreadByChat = hasUnreadMap;
+          _hasUnreadPersonal = hasUnreadPersonal;
+          _hasUnreadGroup = hasUnreadGroup;
+        });
+      }
+      
+      print('[LocalUnread] ИТОГО:');
+      print('[LocalUnread] Непрочитанные личные: $hasUnreadPersonal');
+      print('[LocalUnread] Непрочитанные групповые: $hasUnreadGroup');
+      print('[LocalUnread] Чатов с непрочитанными: ${hasUnreadMap.values.where((v) => v).length} из ${_chats.length}');
+      
+    } catch (e) {
+      print('[LocalUnread] Ошибка загрузки статусов: $e');
+    }
+  }
+
+
+
+
+
+Future<void> _testMarkRead() async {
+  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
+  const chatId = 466; // чат driving car, где есть пользователь 259
+
+  try {
+    final response = await http.post(
+      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/mark-read'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({'chat_id': chatId}),
+    );
+
+    print('MARK-READ STATUS: ${response.statusCode}');
+    print('MARK-READ BODY: ${response.body}');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('mark-read: ${response.statusCode}'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    print('MARK-READ ERROR: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('mark-read error: $e'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+
+Future<void> _testGetChats() async {
+  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
+
+  try {
+    final response = await http.get(
+      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/chats'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('CHATS STATUS: ${response.statusCode}');
+    print('CHATS BODY: ${response.body}');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('chats: ${response.statusCode}'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    print('CHATS ERROR: $e');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('chats error: $e'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+Future<void> _testUnreadCount() async {
+  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
+
+  try {
+    final response = await http.get(
+      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/unread-count'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    print('UNREAD STATUS: ${response.statusCode}');
+    print('UNREAD BODY: ${response.body}');
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('unread: ${response.statusCode}'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    print('UNREAD ERROR: $e');
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('unread error: $e'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+}
+
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -164,8 +377,54 @@ class _ChatsScreenState extends State<ChatsScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: [
-            Tab(icon: Icon(Icons.person), text: 'Личные'),
-            Tab(icon: Icon(Icons.group), text: 'Групповые'),
+            Tab(
+              icon: Stack(
+                children: [
+                  Icon(Icons.person),
+                  if (_hasUnreadPersonal)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 12,
+                          minHeight: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              text: 'Личные',
+            ),
+            Tab(
+              icon: Stack(
+                children: [
+                  Icon(Icons.group),
+                  if (_hasUnreadGroup)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 12,
+                          minHeight: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              text: 'Групповые',
+            ),
           ],
           onTap: (index) {
             setState(() {});
@@ -183,6 +442,62 @@ class _ChatsScreenState extends State<ChatsScreen>
               ).then((_) => _loadData());
             },
           ),
+
+
+
+          IconButton(
+            icon: Icon(Icons.analytics),
+            onPressed: () => LocalUnreadHelper.printStats(),
+            tooltip: 'Статистика',
+          ),
+
+          IconButton(
+            icon: Icon(Icons.delete),
+            onPressed: () async {
+              await LocalUnreadHelper.clearAll();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Данные очищены'))
+              );
+              _loadData();
+            },
+            tooltip: 'Очистить все',
+          ),
+
+
+
+
+
+
+
+
+
+
+
+    IconButton(
+      icon: Icon(Icons.mark_email_read),
+      onPressed: _testUnreadCount,
+      tooltip: 'Тест unread-count',
+    ),
+
+
+
+    IconButton(
+      icon: Icon(Icons.list),
+      onPressed: _testGetChats,
+      tooltip: 'Тест chats',
+    ),
+
+
+
+      IconButton(
+        icon: Icon(Icons.bug_report),
+        onPressed: _testMarkRead,
+        tooltip: 'Тест mark-read',
+      ),
+
+
+
+
         ],
       ),
       body: _isLoading || _currentUser == null

@@ -1,3 +1,5 @@
+import 'package:chat_friends/utils/local_unread_helper.dart';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -36,12 +38,17 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
+        // ДОБАВЬТЕ ЭТУ СТРОКУ: Помечаем чат как прочитанный при открытии
+        _markChatAsRead();
       }
     });
   }
 
   @override
   void dispose() {
+    // Гарантируем, что last_seen сохранен даже при быстром закрытии
+    _markChatAsRead();
+        
     _messageController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -65,6 +72,40 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+
+  /// Сохраняет состояние чата при просмотре
+  Future<void> _markChatAsRead() async {
+    try {
+      final chatId = widget.chat.id;
+      
+      // Получаем текст последнего сообщения
+      String lastText = 'NO_MESSAGES';
+      int messageCount = 0;
+      
+      if (_messages.isNotEmpty) {
+        final lastMessage = _messages.last;
+        lastText = lastMessage.text ?? '[МЕДИА]';
+        messageCount = _messages.length;
+        
+        print('[ChatScreen] Последнее сообщение: "$lastText"');
+        print('[ChatScreen] Всего сообщений: $messageCount');
+      } else if (widget.chat.lastMessage != null) {
+        lastText = widget.chat.lastMessage!.text ?? '[МЕДИА]';
+        messageCount = 1;
+      }
+      
+      // Сохраняем состояние чата
+      await LocalUnreadHelper.saveChatState(
+        chatId: chatId,
+        lastText: lastText,
+        messageCount: messageCount,
+      );
+      
+    } catch (e) {
+      print('[ChatScreen] Ошибка сохранения состояния: $e');
+    }
+  }
+
   Future<void> _loadMessages() async {
     try {
       final messages = await ApiService.getMessages(widget.chat.id);
@@ -72,6 +113,8 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _messages = messages;
         });
+        // ДОБАВЬТЕ ЭТУ СТРОКУ: Обновляем last_seen после загрузки сообщений
+        _markChatAsRead();
       }
     } catch (e) {
       print('Ошибка обновления сообщений: $e');
@@ -158,6 +201,10 @@ class _ChatScreenState extends State<ChatScreen> {
           _file = null;
           _isSending = false;
         });
+
+        // ДОБАВЬТЕ ЭТУ СТРОКУ: Помечаем как прочитанное после отправки
+        _markChatAsRead();
+
       }
       
       _focusNode.requestFocus();
