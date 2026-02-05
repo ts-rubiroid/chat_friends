@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // Добавляем этот импорт
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:chat_friends/utils/api.dart';
 import 'package:chat_friends/models/user.dart';
@@ -595,68 +596,23 @@ class ApiService {
     }
   }
 
+  // === ЗАГРУЗКА ФАЙЛОВ - ИСПРАВЛЕННАЯ ВЕРСИЯ ===
 
-  static Future<Message> sendMessageWithFile(
-      int chatId, String text, File file, String type) async {
-    final token = await getToken();
-    if (token == null) throw Exception('Требуется авторизация');
-
-    final url = Uri.parse(ApiConfig.sendMessageEndpoint);
-    
-    try {
-      var request = http.MultipartRequest('POST', url);
-
-      request.headers.addAll({
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      });
-      
-      request.fields['chat_id'] = chatId.toString();
-      request.fields['text'] = text;
-      request.fields['type'] = type;
-      
-      var multipartFile = await http.MultipartFile.fromPath(
-        'file',
-        file.path,
-        filename: '${type}_${DateTime.now().millisecondsSinceEpoch}.${file.path.split('.').last}',
-      );
-      request.files.add(multipartFile);
-      
-      ApiConfig.logRequest('POST', url.toString(), 
-          body: {'chat_id': chatId, 'text': text, 'type': type});
-      
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-      
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final result = json.decode(responseBody);
-        return Message.fromJson(result);
-      } else {
-        throw Exception('Ошибка ${response.statusCode}: $responseBody');
-      }
-    } catch (e) {
-      print('[API] Ошибка отправки файла: $e');
-      rethrow;
-    }
-  }
-
-  static Future<bool> deleteMessage(int messageId) async {
-    print('[WARNING] deleteMessage не реализован на бэкенде');
-    return false;
-  }
-
-  // === ЗАГРУЗКА ФАЙЛОВ ===
-
+  // СТАРЫЙ МЕТОД: Загрузка аватара (сохраняем для совместимости с register_screen.dart)
   static Future<String?> uploadAvatar(File imageFile) async {
     try {
-      print('📤 Загрузка аватара БЕЗ токена...');
+      print('📤 Загрузка аватара...');
       
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('${ApiConfig.baseUrl}/wp-json/chat-api/v1/upload'),
+        Uri.parse(ApiConfig.uploadEndpoint),
       );
       
-      // БЕЗ заголовка Authorization!
+      // Получаем токен для авторизации
+      final token = await getToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
       
       request.files.add(await http.MultipartFile.fromPath(
         'file',
@@ -683,5 +639,214 @@ class ApiService {
       print('❌ Ошибка загрузки: $e');
       return null;
     }
+  }
+
+  // НОВЫЙ МЕТОД: Универсальная загрузка файла на WordPress сервер
+  static Future<Map<String, dynamic>> uploadFile(File file, {String? fileName}) async {
+    final token = await getToken();
+    if (token == null) throw Exception('Требуется авторизация');
+
+    final url = Uri.parse(ApiConfig.uploadEndpoint);
+    
+    try {
+      print('[API] Загрузка файла на WordPress: ${file.path}');
+      
+      var request = http.MultipartRequest('POST', url);
+
+      // WordPress требует Authorization заголовок
+      request.headers['Authorization'] = 'Bearer $token';
+      
+      // Определяем тип контента на основе расширения файла
+      String? contentType;
+      final extension = file.path.split('.').last.toLowerCase();
+      if (['jpg', 'jpeg'].contains(extension)) {
+        contentType = 'image/jpeg';
+      } else if (extension == 'png') {
+        contentType = 'image/png';
+      } else if (extension == 'gif') {
+        contentType = 'image/gif';
+      } else if (extension == 'pdf') {
+        contentType = 'application/pdf';
+      } else if (extension == 'doc') {
+        contentType = 'application/msword';
+      } else if (extension == 'docx') {
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      } else if (extension == 'xls') {
+        contentType = 'application/vnd.ms-excel';
+      } else if (extension == 'xlsx') {
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      } else {
+        contentType = 'application/octet-stream';
+      }
+      
+      final multipartFile = await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        filename: fileName ?? 'file_${DateTime.now().millisecondsSinceEpoch}.$extension',
+        contentType: contentType != null ? MediaType.parse(contentType) : null,
+      );
+      
+      request.files.add(multipartFile);
+      
+      ApiConfig.logRequest('POST', url.toString(), body: {
+        'file': file.path,
+        'filename': fileName,
+        'contentType': contentType,
+      });
+      
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      
+      print('[API] Ответ загрузки: ${response.statusCode}');
+      print('[API] Тело ответа: $responseBody');
+      
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final result = json.decode(responseBody);
+        
+        // Проверяем WordPress формат ответа
+        if (result is Map<String, dynamic>) {
+          if (result['success'] == true) {
+            final fileData = result['file'];
+            
+            // Возвращаем полные данные о файле
+            return {
+              'success': true,
+              'url': fileData['url'],
+              'name': fileData['name'],
+              'type': fileData['type'],
+              'size': fileData['size'],
+              'id': fileData['id'],
+              'uploaded_at': fileData['uploaded_at'],
+            };
+          } else {
+            throw Exception(result['message'] ?? 'Ошибка загрузки файла');
+          }
+        }
+        throw Exception('Неверный формат ответа от сервера');
+      } else {
+        final errorResult = json.decode(responseBody);
+        throw Exception(errorResult['message'] ?? 'Ошибка ${response.statusCode}');
+      }
+    } catch (e) {
+      print('[API] Ошибка загрузки файла: $e');
+      rethrow;
+    }
+  }
+
+  // ИСПРАВЛЕННЫЙ МЕТОД: Отправка сообщения с файлом (двухэтапный процесс)
+  static Future<Message> sendMessageWithFile(
+      int chatId, String text, File file, String type) async {
+    
+    print('[API] Начало отправки файла типа: $type');
+    
+    try {
+      // ШАГ 1: Загружаем файл на сервер WordPress
+      final uploadResult = await uploadFile(file);
+      
+      if (!uploadResult['success']) {
+        throw Exception('Не удалось загрузить файл: ${uploadResult['error']}');
+      }
+      
+      final fileUrl = uploadResult['url'] as String;
+      final fileName = uploadResult['name'] as String;
+      final fileType = uploadResult['type'] as String;
+      final fileSize = uploadResult['size'] as int;
+      
+      print('[API] Файл загружен: $fileUrl');
+      print('[API] Метаданные: $fileName ($fileType, $fileSize байт)');
+      
+      // ШАГ 2: Отправляем сообщение с URL файла
+      final headers = await _getHeaders();
+      final url = Uri.parse(ApiConfig.sendMessageEndpoint);
+      
+      // Формируем тело запроса в соответствии с WordPress API
+      final body = {
+        'chat_id': chatId,
+        'text': text.isNotEmpty ? text : (type == 'image' ? 'Изображение' : 'Файл'),
+        'type': type,
+      };
+      
+      // Добавляем поле в зависимости от типа
+      if (type == 'image') {
+        body['image_url'] = fileUrl;
+      } else if (type == 'file') {
+        body['file_url'] = fileUrl;
+        body['file_name'] = fileName;
+        body['file_type'] = fileType;
+        body['file_size'] = fileSize;
+      }
+      
+      ApiConfig.logRequest('POST', url.toString(), body: body);
+      
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: json.encode(body),
+      );
+      
+      final result = await _handleResponse(response);
+      print('[API] Ответ отправки сообщения: $result');
+      
+      // Обрабатываем ответ WordPress
+      if (result is Map<String, dynamic>) {
+        if (result['success'] == true) {
+          
+          // Создаем объект Message с метаданными файла
+          final messageJson = {
+            'id': result['message_id'] ?? DateTime.now().millisecondsSinceEpoch,
+            'chat_id': chatId,
+            'sender_id': result['sender_id'],
+            'text': text,
+            'type': type,
+            'created_at': result['created_at'] ?? DateTime.now().toIso8601String(),
+          };
+          
+          // Добавляем поля файла в зависимости от типа
+          if (type == 'image') {
+            messageJson['image'] = fileUrl;
+            messageJson['image_url'] = fileUrl;
+          } else if (type == 'file') {
+            messageJson['file'] = fileUrl;
+            messageJson['file_url'] = fileUrl;
+            messageJson['file_name'] = fileName;
+            messageJson['file_type'] = fileType;
+            messageJson['file_size'] = fileSize;
+          }
+          
+          return Message.fromJson(messageJson);
+        } else {
+          throw Exception(result['message'] ?? 'Ошибка отправки сообщения');
+        }
+      }
+      
+      // Если формат ответа не распознан, создаем локальное сообщение
+      return Message.createLocal(
+        chatId: chatId,
+        text: text,
+        senderId: 0, // Временно
+        type: type,
+        image: type == 'image' ? fileUrl : null,
+        file: type == 'file' ? fileUrl : null,
+        fileName: type == 'file' ? fileName : null,
+        fileType: type == 'file' ? fileType : null,
+        fileSize: type == 'file' ? fileSize : null,
+      );
+      
+    } catch (e) {
+      print('[API] Критическая ошибка отправки файла: $e');
+      
+      // Создаем локальное сообщение даже при ошибке
+      return Message.createLocal(
+        chatId: chatId,
+        text: 'Не удалось отправить файл: ${e.toString()}',
+        senderId: 0,
+        type: type,
+      );
+    }
+  }
+
+  static Future<bool> deleteMessage(int messageId) async {
+    print('[WARNING] deleteMessage не реализован на бэкенде');
+    return false;
   }
 }

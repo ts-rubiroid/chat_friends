@@ -1,4 +1,5 @@
 import '../utils/api.dart';
+import 'dart:math' as math; // Добавляем импорт для функции min
 
 class Message {
   final int id;
@@ -9,6 +10,12 @@ class Message {
   final String? file;
   final String? type;
   final DateTime? createdAt;
+  
+  // НОВЫЕ ПОЛЯ для метаданных файлов
+  final String? fileName;
+  final String? fileType;
+  final int? fileSize;
+  final String? localPath; // Для локального кэширования
 
   Message({
     required this.id,
@@ -19,22 +26,42 @@ class Message {
     this.file,
     this.type,
     this.createdAt,
+    // Новые параметры
+    this.fileName,
+    this.fileType,
+    this.fileSize,
+    this.localPath,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    // УЛУЧШЕНИЕ 1: Более гибкий парсинг sender_id
+    // УЛУЧШЕНИЕ: WordPress возвращает message_id вместо id
+    final messageId = json['message_id'] ?? json['id'];
+    
+    // УЛУЧШЕНИЕ: Более гибкий парсинг sender_id
     final senderId = json['sender_id'] ?? 
                     json['sender'] ?? 
                     json['author'] ?? 
                     json['user_id'] ?? 0;
     
-    // УЛУЧШЕНИЕ 2: Парсим chat_id из разных полей
+    // УЛУЧШЕНИЕ: Парсим chat_id из разных полей
     final chatId = json['chat_id'] ?? 
                    json['chat'] ?? 
                    json['room_id'] ?? 0;
 
+    // НОВОЕ: Парсим метаданные файла из WordPress ответа
+    String? fileName;
+    String? fileType;
+    int? fileSize;
+    
+    if (json['file'] is Map<String, dynamic>) {
+      final fileData = json['file'] as Map<String, dynamic>;
+      fileName = fileData['name']?.toString();
+      fileType = fileData['type']?.toString();
+      fileSize = _parseInt(fileData['size']);
+    }
+
     return Message(
-      id: _parseInt(json['id']),
+      id: _parseInt(messageId),
       chatId: _parseInt(chatId),
       senderId: _parseInt(senderId),
       text: json['text']?.toString(),
@@ -42,6 +69,10 @@ class Message {
       file: json['file']?.toString() ?? json['file_url']?.toString(),
       type: json['type']?.toString() ?? 'text',
       createdAt: _parseDateTime(json['created_at'] ?? json['date'] ?? json['timestamp']),
+      // Новые поля
+      fileName: fileName ?? json['file_name']?.toString(),
+      fileType: fileType ?? json['file_type']?.toString(),
+      fileSize: fileSize ?? _parseInt(json['file_size']),
     );
   }
 
@@ -52,6 +83,7 @@ class Message {
       if (value == 'null' || value.isEmpty) return 0;
       return int.tryParse(value) ?? 0;
     }
+    if (value is double) return value.toInt();
     return 0;
   }
 
@@ -61,7 +93,13 @@ class Message {
     if (value is String) {
       if (value == 'null' || value.isEmpty) return null;
       try {
-        return DateTime.parse(value);
+        // Пробуем разные форматы
+        if (value.contains('T')) {
+          return DateTime.parse(value);
+        } else {
+          // Формат WordPress: "2026-02-05 09:15:26"
+          return DateTime.parse(value.replaceAll(' ', 'T'));
+        }
       } catch (_) {
         return null;
       }
@@ -69,23 +107,17 @@ class Message {
     return null;
   }
 
-  // УЛУЧШЕНИЕ 3: Методы возвращают строку вместо null
+  // УЛУЧШЕНИЕ: Используем ApiConfig.getFileUrl для корректных URL
   String get imageUrl {
     if (image != null && image!.isNotEmpty && image != 'null') {
-      if (image!.startsWith('http')) return image!;
-      if (ApiConfig.uploadsUrl != null) {
-        return '${ApiConfig.uploadsUrl}/$image';
-      }
+      return ApiConfig.getFileUrl(image);
     }
     return '';
   }
 
   String get fileUrl {
     if (file != null && file!.isNotEmpty && file != 'null') {
-      if (file!.startsWith('http')) return file!;
-      if (ApiConfig.uploadsUrl != null) {
-        return '${ApiConfig.uploadsUrl}/$file';
-      }
+      return ApiConfig.getFileUrl(file);
     }
     return '';
   }
@@ -132,6 +164,9 @@ class Message {
     required int senderId,
     String? image,
     String? file,
+    String? fileName,
+    String? fileType,
+    int? fileSize,
     String type = 'text',
   }) {
     return Message(
@@ -143,6 +178,9 @@ class Message {
       file: file,
       type: type,
       createdAt: DateTime.now(),
+      fileName: fileName,
+      fileType: fileType,
+      fileSize: fileSize,
     );
   }
 
@@ -156,6 +194,10 @@ class Message {
     String? file,
     String? type,
     DateTime? createdAt,
+    String? fileName,
+    String? fileType,
+    int? fileSize,
+    String? localPath,
   }) {
     return Message(
       id: id ?? this.id,
@@ -166,6 +208,10 @@ class Message {
       file: file ?? this.file,
       type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
+      fileName: fileName ?? this.fileName,
+      fileType: fileType ?? this.fileType,
+      fileSize: fileSize ?? this.fileSize,
+      localPath: localPath ?? this.localPath,
     );
   }
 
@@ -175,14 +221,39 @@ class Message {
       'id': id,
       'chatId': chatId,
       'senderId': senderId,
-      'text': text?.substring(0, min(text!.length, 30)),
+      'text': text?.substring(0, math.min(text?.length ?? 0, 30)),
       'hasImage': hasImage,
       'hasFile': hasFile,
       'type': type,
+      'fileName': fileName,
+      'fileSize': fileSize,
       'createdAt': createdAt?.toIso8601String(),
     };
   }
-}
 
-// Вспомогательная функция для минимума
-int min(int a, int b) => a < b ? a : b;
+  // НОВЫЙ МЕТОД: Получение отображаемого имени файла
+  String get displayFileName {
+    if (fileName != null && fileName!.isNotEmpty) {
+      return fileName!;
+    }
+    if (hasFile) {
+      final url = fileUrl;
+      final segments = url.split('/');
+      return segments.last;
+    }
+    return 'Файл';
+  }
+
+  // НОВЫЙ МЕТОД: Получение размера файла в читаемом формате
+  String get formattedFileSize {
+    if (fileSize == null || fileSize == 0) return '';
+    
+    if (fileSize! < 1024) {
+      return '${fileSize} Б';
+    } else if (fileSize! < 1024 * 1024) {
+      return '${(fileSize! / 1024).toStringAsFixed(1)} КБ';
+    } else {
+      return '${(fileSize! / (1024 * 1024)).toStringAsFixed(1)} МБ';
+    }
+  }
+}
