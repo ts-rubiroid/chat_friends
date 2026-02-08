@@ -1,5 +1,5 @@
 import '../utils/api.dart';
-import 'dart:math' as math; // Добавляем импорт для функции min
+import 'dart:math' as math;
 
 class Message {
   final int id;
@@ -34,30 +34,83 @@ class Message {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
-    // УЛУЧШЕНИЕ: WordPress возвращает message_id вместо id
+    // WordPress возвращает message_id вместо id
     final messageId = json['message_id'] ?? json['id'];
     
-    // УЛУЧШЕНИЕ: Более гибкий парсинг sender_id
     final senderId = json['sender_id'] ?? 
                     json['sender'] ?? 
                     json['author'] ?? 
                     json['user_id'] ?? 0;
     
-    // УЛУЧШЕНИЕ: Парсим chat_id из разных полей
     final chatId = json['chat_id'] ?? 
-                   json['chat'] ?? 
-                   json['room_id'] ?? 0;
+                  json['chat'] ?? 
+                  json['room_id'] ?? 0;
 
-    // НОВОЕ: Парсим метаданные файла из WordPress ответа
-    String? fileName;
-    String? fileType;
-    int? fileSize;
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: WordPress может возвращать строку "null"
+    String? imageUrl;
+    String? fileUrl;
     
-    if (json['file'] is Map<String, dynamic>) {
-      final fileData = json['file'] as Map<String, dynamic>;
-      fileName = fileData['name']?.toString();
-      fileType = fileData['type']?.toString();
-      fileSize = _parseInt(fileData['size']);
+    // Проверяем поле image
+    if (json['image'] != null) {
+      if (json['image'] is String) {
+        final imageValue = json['image'] as String;
+        // УБИРАЕМ проверку на 'null' - пусть даже "null" пройдет
+        if (imageValue.isNotEmpty && imageValue != 'false') {
+          imageUrl = imageValue;
+        }
+      } else if (json['image'] is Map<String, dynamic>) {
+        // Если это объект (из upload ответа)
+        final imageObj = json['image'] as Map<String, dynamic>;
+        if (imageObj['url'] != null) {
+          imageUrl = imageObj['url'] as String;
+        }
+      }
+    }
+    
+    // Проверяем поле file
+    if (json['file'] != null) {
+      if (json['file'] is String) {
+        final fileValue = json['file'] as String;
+        // УБИРАЕМ проверку на 'null'
+        if (fileValue.isNotEmpty && fileValue != 'false') {
+          fileUrl = fileValue;
+        }
+      } else if (json['file'] is Map<String, dynamic>) {
+        // Если это объект
+        final fileObj = json['file'] as Map<String, dynamic>;
+        if (fileObj['url'] != null) {
+          fileUrl = fileObj['url'] as String;
+        }
+      }
+    }
+
+    // ДОПОЛНИТЕЛЬНО: Проверяем альтернативные поля
+    if (imageUrl == null || imageUrl.isEmpty) {
+      if (json['image_url'] != null && json['image_url'] is String) {
+        final altValue = json['image_url'] as String;
+        if (altValue.isNotEmpty && altValue != 'false') {
+          imageUrl = altValue;
+        }
+      }
+    }
+    
+    if (fileUrl == null || fileUrl.isEmpty) {
+      if (json['file_url'] != null && json['file_url'] is String) {
+        final altValue = json['file_url'] as String;
+        if (altValue.isNotEmpty && altValue != 'false') {
+          fileUrl = altValue;
+        }
+      }
+    }
+
+    // Определяем тип
+    String type = 'text';
+    if (imageUrl != null && imageUrl.isNotEmpty && imageUrl != 'null') {
+      type = 'image';
+    } else if (fileUrl != null && fileUrl.isNotEmpty && fileUrl != 'null') {
+      type = 'file';
+    } else if (json['type'] != null && json['type'] is String) {
+      type = json['type'] as String;
     }
 
     return Message(
@@ -65,16 +118,18 @@ class Message {
       chatId: _parseInt(chatId),
       senderId: _parseInt(senderId),
       text: json['text']?.toString(),
-      image: json['image']?.toString() ?? json['image_url']?.toString(),
-      file: json['file']?.toString() ?? json['file_url']?.toString(),
-      type: json['type']?.toString() ?? 'text',
+      // Если imageUrl содержит "null", сохраняем как null
+      image: (imageUrl != null && imageUrl != 'null' && imageUrl.isNotEmpty) ? imageUrl : null,
+      file: (fileUrl != null && fileUrl != 'null' && fileUrl.isNotEmpty) ? fileUrl : null,
+      type: type,
       createdAt: _parseDateTime(json['created_at'] ?? json['date'] ?? json['timestamp']),
-      // Новые поля
-      fileName: fileName ?? json['file_name']?.toString(),
-      fileType: fileType ?? json['file_type']?.toString(),
-      fileSize: fileSize ?? _parseInt(json['file_size']),
+      fileName: json['file_name']?.toString(),
+      fileType: json['file_type']?.toString(),
+      fileSize: _parseInt(json['file_size']),
     );
   }
+
+
 
   static int _parseInt(dynamic value) {
     if (value == null) return 0;
@@ -108,15 +163,23 @@ class Message {
   }
 
   // УЛУЧШЕНИЕ: Используем ApiConfig.getFileUrl для корректных URL
+  
   String get imageUrl {
-    if (image != null && image!.isNotEmpty && image != 'null') {
+    if (image != null && image!.isNotEmpty && image != 'null' && image != 'false') {
+      // Если image уже полный URL, возвращаем как есть
+      if (image!.startsWith('http')) {
+        return image!;
+      }
       return ApiConfig.getFileUrl(image);
     }
     return '';
   }
 
   String get fileUrl {
-    if (file != null && file!.isNotEmpty && file != 'null') {
+    if (file != null && file!.isNotEmpty && file != 'null' && file != 'false') {
+      if (file!.startsWith('http')) {
+        return file!;
+      }
       return ApiConfig.getFileUrl(file);
     }
     return '';

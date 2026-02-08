@@ -8,6 +8,7 @@ import 'package:chat_friends/utils/api.dart';
 import 'package:chat_friends/models/user.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
+import 'package:chat_friends/services/media_storage.dart';
 
 class ApiService {
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
@@ -438,9 +439,9 @@ class ApiService {
   // === СООБЩЕНИЯ ===
 
   // Получить сообщения чата - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
   static Future<List<Message>> getMessages(int chatId) async {
     final headers = await _getHeaders();
-    // ИСПРАВЛЕНИЕ: Используем правильный endpoint с query параметром
     final url = Uri.parse('${ApiConfig.messagesEndpoint}?chat_id=$chatId&page=1&per_page=50');
 
     ApiConfig.logRequest('GET', url.toString());
@@ -449,14 +450,119 @@ class ApiService {
       final response = await http.get(url, headers: headers);
       final result = await _handleResponse(response);
       
+
+      // ДОБАВЬТЕ ЭТОТ ОТЛАДОЧНЫЙ КОД
+      print('[DEBUG] Ответ getMessages:');
+      print('Статус: ${response.statusCode}');
+      print('Тело: ${response.body}');
+
+
+
+
+
+
       final List messagesData = result is List ? result : (result['data'] ?? result['messages'] ?? []);
-      return messagesData.map((json) => Message.fromJson(json)).toList();
+
+      // Проверьте структуру первого сообщения с медиа
+      if (messagesData.isNotEmpty) {
+        for (var msg in messagesData) {
+          if (msg is Map<String, dynamic>) {
+            print('[DEBUG] Сообщение ID: ${msg['id']}');
+            print('[DEBUG] Поле image: ${msg['image']}');
+            print('[DEBUG] Поле file: ${msg['file']}');
+            print('[DEBUG] Поле text: ${msg['text']}');
+            
+            // Если нашли медиа - остановитесь
+            if (msg['image'] != null && msg['image'] != 'null') {
+              print('[DEBUG] ✅ Найден image URL: ${msg['image']}');
+              break;
+            }
+          }
+        }
+      }
+      // КОНЕЦ ОТЛАДОЧНОГО КОДА
+
+
+
+
+
+      // Преобразуем каждое сообщение с учетом локальных метаданных
+      final List<Message> messages = [];
+      
+      for (final json in messagesData) {
+        final message = await _createMessageWithLocalMedia(json);
+        messages.add(message);
+      }
+      
+      return messages;
+      
     } catch (e) {
       print('[ERROR] Ошибка получения сообщений: $e');
       return [];
     }
   }
 
+  // НОВЫЙ ВСПОМОГАТЕЛЬНЫЙ МЕТОД
+  static Future<Message> _createMessageWithLocalMedia(Map<String, dynamic> json) async {
+    final messageId = _parseInt(json['message_id'] ?? json['id']);
+    
+    // 1. Пробуем получить из локального хранилища
+    final localMedia = await MediaStorage.getMediaForMessage(messageId);
+    
+    String? imageUrl = localMedia['imageUrl'];
+    String? fileUrl = localMedia['fileUrl'];
+    String? fileName = localMedia['fileName'];
+    String? fileType = localMedia['fileType'];
+    int? fileSize = _parseInt(localMedia['fileSize']);
+    
+    // 2. Если нет в хранилище, пробуем из JSON (на случай, если сервер всё же вернул)
+    if (imageUrl == null || imageUrl.isEmpty) {
+      if (json['image'] != null && json['image'] is String) {
+        final imageValue = json['image'] as String;
+        if (imageValue.isNotEmpty && imageValue != 'null' && imageValue != 'false') {
+          imageUrl = imageValue;
+        }
+      }
+    }
+    
+    if (fileUrl == null || fileUrl.isEmpty) {
+      if (json['file'] != null && json['file'] is String) {
+        final fileValue = json['file'] as String;
+        if (fileValue.isNotEmpty && fileValue != 'null' && fileValue != 'false') {
+          fileUrl = fileValue;
+        }
+      }
+    }
+    
+    // 3. Определяем тип
+    String type = 'text';
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      type = 'image';
+    } else if (fileUrl != null && fileUrl.isNotEmpty) {
+      type = 'file';
+    } else if (json['type'] != null && json['type'] is String) {
+      type = json['type'] as String;
+    }
+    
+    // Логирование для отладки
+    if (type == 'image' || type == 'file') {
+      print('[API] Восстановлен URL для сообщения $messageId: ${imageUrl ?? fileUrl}');
+    }
+    
+    return Message(
+      id: messageId,
+      chatId: _parseInt(json['chat_id'] ?? json['chat'] ?? json['room_id'] ?? 0),
+      senderId: _parseInt(json['sender_id'] ?? json['sender'] ?? json['author'] ?? json['user_id'] ?? 0),
+      text: json['text']?.toString(),
+      image: imageUrl,
+      file: fileUrl,
+      type: type,
+      createdAt: _parseDateTime(json['created_at'] ?? json['date'] ?? json['timestamp']),
+      fileName: fileName ?? json['file_name']?.toString(),
+      fileType: fileType ?? json['file_type']?.toString(),
+      fileSize: fileSize ?? _parseInt(json['file_size']),
+    );
+  }
 
 
 
@@ -733,19 +839,19 @@ class ApiService {
     }
   }
 
-  // ИСПРАВЛЕННЫЙ МЕТОД: Отправка сообщения с файлом (двухэтапный процесс)
+ 
+
+
+  // ИСПРАВЛЕННЫЙ МЕТОД: Отправка сообщения с файлом
+
   static Future<Message> sendMessageWithFile(
       int chatId, String text, File file, String type) async {
     
-    print('[API] Начало отправки файла типа: $type');
+    print('[API] Отправка файла типа: $type');
     
     try {
-      // ШАГ 1: Загружаем файл на сервер WordPress
+      // 1. Загружаем файл на WordPress
       final uploadResult = await uploadFile(file);
-      
-      if (!uploadResult['success']) {
-        throw Exception('Не удалось загрузить файл: ${uploadResult['error']}');
-      }
       
       final fileUrl = uploadResult['url'] as String;
       final fileName = uploadResult['name'] as String;
@@ -753,30 +859,22 @@ class ApiService {
       final fileSize = uploadResult['size'] as int;
       
       print('[API] Файл загружен: $fileUrl');
-      print('[API] Метаданные: $fileName ($fileType, $fileSize байт)');
       
-      // ШАГ 2: Отправляем сообщение с URL файла
+      // 2. Отправляем сообщение
       final headers = await _getHeaders();
       final url = Uri.parse(ApiConfig.sendMessageEndpoint);
       
-      // Формируем тело запроса в соответствии с WordPress API
       final body = {
         'chat_id': chatId,
         'text': text.isNotEmpty ? text : (type == 'image' ? 'Изображение' : 'Файл'),
         'type': type,
       };
       
-      // Добавляем поле в зависимости от типа
       if (type == 'image') {
         body['image_url'] = fileUrl;
       } else if (type == 'file') {
         body['file_url'] = fileUrl;
-        body['file_name'] = fileName;
-        body['file_type'] = fileType;
-        body['file_size'] = fileSize;
       }
-      
-      ApiConfig.logRequest('POST', url.toString(), body: body);
       
       final response = await http.post(
         url,
@@ -785,65 +883,93 @@ class ApiService {
       );
       
       final result = await _handleResponse(response);
-      print('[API] Ответ отправки сообщения: $result');
       
-      // Обрабатываем ответ WordPress
-      if (result is Map<String, dynamic>) {
-        if (result['success'] == true) {
-          
-          // Создаем объект Message с метаданными файла
-          final messageJson = {
-            'id': result['message_id'] ?? DateTime.now().millisecondsSinceEpoch,
-            'chat_id': chatId,
-            'sender_id': result['sender_id'],
-            'text': text,
-            'type': type,
-            'created_at': result['created_at'] ?? DateTime.now().toIso8601String(),
-          };
-          
-          // Добавляем поля файла в зависимости от типа
-          if (type == 'image') {
-            messageJson['image'] = fileUrl;
-            messageJson['image_url'] = fileUrl;
-          } else if (type == 'file') {
-            messageJson['file'] = fileUrl;
-            messageJson['file_url'] = fileUrl;
-            messageJson['file_name'] = fileName;
-            messageJson['file_type'] = fileType;
-            messageJson['file_size'] = fileSize;
-          }
-          
-          return Message.fromJson(messageJson);
-        } else {
-          throw Exception(result['message'] ?? 'Ошибка отправки сообщения');
-        }
+      // 3. Получаем ID сообщения из ответа сервера
+      int messageId;
+      int senderId;
+      String createdAt;
+      
+      if (result is Map<String, dynamic> && result['success'] == true) {
+        messageId = _parseInt(result['message_id'] ?? DateTime.now().millisecondsSinceEpoch);
+        senderId = _parseInt(result['sender_id'] ?? 0);
+        createdAt = result['created_at']?.toString() ?? DateTime.now().toIso8601String();
+      } else {
+        messageId = DateTime.now().millisecondsSinceEpoch;
+        senderId = 0;
+        createdAt = DateTime.now().toIso8601String();
       }
       
-      // Если формат ответа не распознан, создаем локальное сообщение
-      return Message.createLocal(
+      // 4. ВАЖНО: Сохраняем в локальное хранилище
+      await MediaStorage.saveMediaForMessage(
+        messageId,
+        imageUrl: type == 'image' ? fileUrl : null,
+        fileUrl: type == 'file' ? fileUrl : null,
+        fileName: type == 'file' ? fileName : null,
+        fileType: type == 'file' ? fileType : null,
+        fileSize: type == 'file' ? fileSize : null,
+      );
+      
+      print('[API] Локально сохранен URL для сообщения $messageId: $fileUrl');
+      
+      // 5. Создаем объект Message с правильными данными
+      return Message(
+        id: messageId,
         chatId: chatId,
-        text: text,
-        senderId: 0, // Временно
-        type: type,
+        senderId: senderId,
+        text: text.isNotEmpty ? text : (type == 'image' ? 'Изображение' : 'Файл'),
         image: type == 'image' ? fileUrl : null,
         file: type == 'file' ? fileUrl : null,
+        type: type,
+        createdAt: _parseDateTime(createdAt),
         fileName: type == 'file' ? fileName : null,
         fileType: type == 'file' ? fileType : null,
         fileSize: type == 'file' ? fileSize : null,
       );
       
     } catch (e) {
-      print('[API] Критическая ошибка отправки файла: $e');
+      print('[API] Ошибка отправки: $e');
       
-      // Создаем локальное сообщение даже при ошибке
       return Message.createLocal(
         chatId: chatId,
-        text: 'Не удалось отправить файл: ${e.toString()}',
+        text: 'Не удалось отправить файл',
         senderId: 0,
         type: type,
       );
     }
   }
+
+  // Добавьте этот вспомогательный метод в класс ApiService
+  static int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is String) {
+      if (value == 'null' || value.isEmpty) return 0;
+      return int.tryParse(value) ?? 0;
+    }
+    if (value is double) return value.toInt();
+    return 0;
+  }
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) {
+      if (value == 'null' || value.isEmpty) return null;
+      try {
+        if (value.contains('T')) {
+          return DateTime.parse(value);
+        } else {
+          return DateTime.parse(value.replaceAll(' ', 'T'));
+        }
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+
+
 
   static Future<bool> deleteMessage(int messageId) async {
     print('[WARNING] deleteMessage не реализован на бэкенде');

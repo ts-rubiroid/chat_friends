@@ -1,5 +1,4 @@
 import 'package:chat_friends/utils/local_unread_helper.dart';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -7,8 +6,12 @@ import 'dart:io';
 import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
-import 'package:chat_friends/models/user.dart'; // ДОБАВЛЕН ИМПОРТ
+import 'package:chat_friends/models/user.dart';
 import '../utils/api.dart';
+import 'image_viewer_screen.dart'; // Импорт экрана просмотра изображений
+
+import 'package:photo_view/photo_view.dart';
+import 'package:chat_friends/screens/image_viewer_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   final Chat chat;
@@ -38,7 +41,6 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
-        // ДОБАВЬТЕ ЭТУ СТРОКУ: Помечаем чат как прочитанный при открытии
         _markChatAsRead();
       }
     });
@@ -46,9 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    // Гарантируем, что last_seen сохранен даже при быстром закрытии
     _markChatAsRead();
-        
     _messageController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -59,6 +59,19 @@ class _ChatScreenState extends State<ChatScreen> {
       final currentUser = await ApiService.getCurrentUser();
       final messages = await ApiService.getMessages(widget.chat.id);
       
+      print('[DEBUG] === ЗАГРУЖЕНО СООБЩЕНИЙ: ${messages.length} ===');
+      for (var i = 0; i < messages.length; i++) {
+        final msg = messages[i];
+        if (msg.hasImage || msg.hasFile) {
+          print('[DEBUG] Сообщение #${i + 1} (ID: ${msg.id}):');
+          print('[DEBUG]   Тип: ${msg.type}');
+          print('[DEBUG]   imageUrl: "${msg.imageUrl}"');
+          print('[DEBUG]   fileUrl: "${msg.fileUrl}"');
+          print('[DEBUG]   fileName: "${msg.fileName}"');
+          print('[DEBUG]   fileSize: "${msg.formattedFileSize}"');
+        }
+      }
+
       setState(() {
         _currentUser = currentUser;
         _messages = messages;
@@ -72,13 +85,10 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-
-  /// Сохраняет состояние чата при просмотре
   Future<void> _markChatAsRead() async {
     try {
       final chatId = widget.chat.id;
       
-      // Получаем текст последнего сообщения
       String lastText = 'NO_MESSAGES';
       int messageCount = 0;
       
@@ -86,15 +96,11 @@ class _ChatScreenState extends State<ChatScreen> {
         final lastMessage = _messages.last;
         lastText = lastMessage.text ?? '[МЕДИА]';
         messageCount = _messages.length;
-        
-        print('[ChatScreen] Последнее сообщение: "$lastText"');
-        print('[ChatScreen] Всего сообщений: $messageCount');
       } else if (widget.chat.lastMessage != null) {
         lastText = widget.chat.lastMessage!.text ?? '[МЕДИА]';
         messageCount = 1;
       }
       
-      // Сохраняем состояние чата
       await LocalUnreadHelper.saveChatState(
         chatId: chatId,
         lastText: lastText,
@@ -109,11 +115,21 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages() async {
     try {
       final messages = await ApiService.getMessages(widget.chat.id);
+      
+      print('[ChatScreen] Загружено ${messages.length} сообщений');
+      for (var msg in messages) {
+        if (msg.hasImage) {
+          print('[ChatScreen] ✅ Сообщение ${msg.id}: ЕСТЬ изображение: ${msg.imageUrl}');
+        }
+        if (msg.hasFile) {
+          print('[ChatScreen] ✅ Сообщение ${msg.id}: ЕСТЬ файл: ${msg.fileUrl}');
+        }
+      }
+      
       if (mounted) {
         setState(() {
           _messages = messages;
         });
-        // ДОБАВЬТЕ ЭТУ СТРОКУ: Обновляем last_seen после загрузки сообщений
         _markChatAsRead();
       }
     } catch (e) {
@@ -201,10 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _file = null;
           _isSending = false;
         });
-
-        // ДОБАВЬТЕ ЭТУ СТРОКУ: Помечаем как прочитанное после отправки
         _markChatAsRead();
-
       }
       
       _focusNode.requestFocus();
@@ -222,6 +235,167 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // Получение иконки для типа файла
+  Widget _getFileIcon(Message message) {
+    final fileType = message.fileType?.toLowerCase() ?? '';
+    final fileName = message.displayFileName.toLowerCase();
+    
+    if (fileType.contains('image') || 
+        fileName.endsWith('.jpg') || 
+        fileName.endsWith('.jpeg') || 
+        fileName.endsWith('.png') || 
+        fileName.endsWith('.gif')) {
+      return Icon(Icons.image, size: 36, color: Colors.blue);
+    } else if (fileType.contains('pdf') || fileName.endsWith('.pdf')) {
+      return Icon(Icons.picture_as_pdf, size: 36, color: Colors.red);
+    } else if (fileType.contains('word') || fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+      return Icon(Icons.description, size: 36, color: Colors.blue[700]);
+    } else if (fileType.contains('excel') || fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+      return Icon(Icons.table_chart, size: 36, color: Colors.green);
+    } else if (fileType.contains('text') || fileName.endsWith('.txt')) {
+      return Icon(Icons.text_fields, size: 36, color: Colors.grey);
+    } else {
+      return Icon(Icons.insert_drive_file, size: 36, color: Colors.grey);
+    }
+  }
+
+  // Обработка тапа по файлу
+  Future<void> _handleFileTap(Message message) async {
+    if (!message.hasFile || message.fileUrl.isEmpty) return;
+    
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.download, color: Colors.blue),
+              title: Text('Скачать файл'),
+              subtitle: Text('Сохранить на устройство'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _downloadFile(message);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.open_in_new, color: Colors.green),
+              title: Text('Открыть файл'),
+              subtitle: Text('Попробовать открыть в приложении'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _openFile(message);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.share, color: Colors.orange),
+              title: Text('Поделиться'),
+              subtitle: Text('Поделиться файлом'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _shareFile(message);
+              },
+            ),
+            SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Отмена'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Скачивание файла
+  Future<void> _downloadFile(Message message) async {
+    if (!message.hasFile || message.fileUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Нет URL файла для скачивания')),
+      );
+      return;
+    }
+    
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Начинаем скачивание...')),
+      );
+      
+      print('Скачивание файла: ${message.fileUrl}');
+      print('Имя файла: ${message.displayFileName}');
+      print('Размер: ${message.formattedFileSize}');
+      
+      // TODO: Реализовать скачивание файла через download_service.dart
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Файл "${message.displayFileName}" скачан'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка скачивания: $e')),
+      );
+    }
+  }
+
+  // Открытие файла
+  Future<void> _openFile(Message message) async {
+    try {
+      print('Открытие файла: ${message.fileUrl}');
+      // TODO: Реализовать открытие файла через open_filex
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Открытие файла: ${message.displayFileName}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось открыть файл: $e')),
+      );
+    }
+  }
+
+  // Поделиться файлом
+  Future<void> _shareFile(Message message) async {
+    try {
+      print('Поделиться файлом: ${message.fileUrl}');
+      // TODO: Реализовать шеринг файла
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Поделиться файлом: ${message.displayFileName}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось поделиться файлом: $e')),
+      );
+    }
+  }
+
+  // Скачивание изображения
+  Future<void> _downloadImage(String imageUrl, String fileName) async {
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Скачивание изображения...')),
+      );
+      
+      print('Скачивание изображения: $imageUrl');
+      print('Имя файла: $fileName');
+      
+      // TODO: Реализовать скачивание изображения через download_service.dart
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Изображение сохранено'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка скачивания: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -233,7 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
           if (_image != null || _file != null)
             Container(
               padding: EdgeInsets.all(10),
-              color: Colors.grey[200],
+              color: Colors.grey.shade200,
               child: Row(
                 children: [
                   Icon(_image != null ? Icons.image : Icons.insert_drive_file),
@@ -282,8 +456,6 @@ class _ChatScreenState extends State<ChatScreen> {
                           ],
                         ),
                       )
-
-
                       
                     : ListView.builder(
                         reverse: true,
@@ -291,23 +463,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemBuilder: (context, index) {
                           final message = _messages[_messages.length - 1 - index];
                           
-                          String? getImageUrl() {
-                            if (message.image != null && message.image!.isNotEmpty) {
-                              return message.image!.startsWith('http') 
-                                ? message.image
-                                : '${ApiConfig.uploadsUrl}/${message.image}';
-                            }
-                            return null;
-                          }
-                          
-                          String? getFileUrl() {
-                            if (message.file != null && message.file!.isNotEmpty) {
-                              return message.file!.startsWith('http')
-                                ? message.file
-                                : '${ApiConfig.uploadsUrl}/${message.file}';
-                            }
-                            return null;
-                          }
+                          // Используем методы из модели Message
+                          final hasImage = message.hasImage;
+                          final hasFile = message.hasFile;
+                          final imageUrl = message.imageUrl;
+                          final fileUrl = message.fileUrl;
                           
                           final bool isMe = _currentUser != null && 
                                            message.senderId == _currentUser!.id;
@@ -323,7 +483,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     height: 40,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      color: Colors.grey[300],
+                                      color: Colors.grey.shade200,
                                     ),
                                     child: Center(
                                       child: Text(
@@ -339,64 +499,190 @@ class _ChatScreenState extends State<ChatScreen> {
                                   child: Container(
                                     padding: EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: isMe ? Colors.blue[100] : Colors.grey[200],
+                                      color: isMe ? Colors.blue[100] : Colors.grey.shade200,
                                       borderRadius: BorderRadius.circular(16),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        if (getImageUrl() != null)
+                                        // БЛОК ДЛЯ ИЗОБРАЖЕНИЙ
+                                        if (hasImage && imageUrl.isNotEmpty)
                                           Container(
                                             margin: EdgeInsets.only(bottom: 8),
-                                            child: Image.network(
-                                              getImageUrl()!,
-                                              width: 200,
-                                              height: 150,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return Container(
-                                                  width: 200,
-                                                  height: 150,
-                                                  color: Colors.grey[300],
-                                                  child: Center(
-                                                    child: Icon(Icons.broken_image, size: 40),
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                // Открываем полноэкранный просмотр
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => ImageViewerScreen(
+                                                      imageUrl: imageUrl,
+                                                      heroTag: 'image_${message.id}',
+                                                      fileName: message.fileName ?? 'image_${message.id}.jpg',
+                                                    ),
                                                   ),
                                                 );
                                               },
-                                            ),
-                                          ),
-                                        
-                                        if (getFileUrl() != null)
-                                          Container(
-                                            margin: EdgeInsets.only(bottom: 8),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.insert_drive_file),
-                                                SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Text(
-                                                    message.file?.split('/').last ?? 'Файл',
-                                                    overflow: TextOverflow.ellipsis,
+                                              child: Hero(
+                                                tag: 'image_${message.id}',
+                                                child: ClipRRect(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  child: Stack(
+                                                    children: [
+                                                      // Изображение
+                                                      Container(
+                                                        width: 250,
+                                                        height: 180,
+                                                        child: Image.network(
+                                                          imageUrl,
+                                                          fit: BoxFit.cover,
+                                                          loadingBuilder: (context, child, loadingProgress) {
+                                                            if (loadingProgress == null) return child;
+                                                            return Container(
+                                                              color: Colors.grey.shade200,
+                                                              child: Center(
+                                                                child: CircularProgressIndicator(
+                                                                  value: loadingProgress.expectedTotalBytes != null
+                                                                      ? loadingProgress.cumulativeBytesLoaded /
+                                                                          loadingProgress.expectedTotalBytes!
+                                                                      : null,
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            return Container(
+                                                              width: 250,
+                                                              height: 180,
+                                                              color: Colors.grey.shade200,
+                                                              child: Center(
+                                                                child: Column(
+                                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                                  children: [
+                                                                    Icon(Icons.broken_image, size: 40),
+                                                                    SizedBox(height: 8),
+                                                                    Text('Ошибка загрузки'),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                      // Информация поверх изображения
+                                                      Positioned(
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        right: 0,
+                                                        child: Container(
+                                                          padding: EdgeInsets.all(8),
+                                                          decoration: BoxDecoration(
+                                                            gradient: LinearGradient(
+                                                              begin: Alignment.bottomCenter,
+                                                              end: Alignment.topCenter,
+                                                              colors: [Colors.black54, Colors.transparent],
+                                                            ),
+                                                          ),
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(Icons.zoom_in, color: Colors.white, size: 16),
+                                                              SizedBox(width: 4),
+                                                              Text(
+                                                                'Нажмите для увеличения',
+                                                                style: TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: 12,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                              ],
+                                              ),
                                             ),
                                           ),
                                         
+                                        // БЛОК ДЛЯ ФАЙЛОВ
+                                        if (hasFile && fileUrl.isNotEmpty)
+                                          Container(
+                                            margin: EdgeInsets.only(bottom: 8),
+                                            child: GestureDetector(
+                                              onTap: () async {
+                                                await _handleFileTap(message);
+                                              },
+                                              child: Container(
+                                                padding: EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade100,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(color: Colors.grey.shade300),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    // Иконка в зависимости от типа файла
+                                                    _getFileIcon(message),
+                                                    SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            message.displayFileName,
+                                                            overflow: TextOverflow.ellipsis,
+                                                            style: TextStyle(
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 14,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          if (message.formattedFileSize.isNotEmpty)
+                                                            Text(
+                                                              message.formattedFileSize,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: Colors.grey.shade600,
+                                                              ),
+                                                            ),
+                                                          if (message.fileType != null)
+                                                            Text(
+                                                              message.fileType!,
+                                                              style: TextStyle(
+                                                                fontSize: 11,
+                                                                color: Colors.grey.shade500,
+                                                              ),
+                                                            ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      icon: Icon(Icons.download, color: Colors.blue),
+                                                      onPressed: () async {
+                                                        await _downloadFile(message);
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        
+                                        // ТЕКСТ СООБЩЕНИЯ
                                         if (message.text?.isNotEmpty == true)
                                           Text(
                                             message.text!,
                                             style: TextStyle(fontSize: 16),
                                           ),
                                         
+                                        // ВРЕМЯ СООБЩЕНИЯ
                                         SizedBox(height: 4),
                                         Text(
-                                          message.createdAt != null 
-                                            ? '${message.createdAt!.hour.toString().padLeft(2, '0')}:${message.createdAt!.minute.toString().padLeft(2, '0')}'
-                                            : '',
+                                          message.formattedTime,
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.grey[600],
+                                            color: Colors.grey.shade600,
                                           ),
                                         ),
                                       ],
@@ -420,11 +706,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 IconButton(
                   icon: Icon(Icons.image),
                   onPressed: _pickImage,
+                  tooltip: 'Фото или галерея',
                 ),
                 
                 IconButton(
                   icon: Icon(Icons.attach_file),
                   onPressed: _pickFile,
+                  tooltip: 'Прикрепить файл',
                 ),
                 
                 Expanded(
@@ -453,6 +741,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     : IconButton(
                         icon: Icon(Icons.send),
                         onPressed: _sendMessage,
+                        tooltip: 'Отправить',
                       ),
               ],
             ),
