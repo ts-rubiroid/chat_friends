@@ -8,12 +8,7 @@ import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
 import 'package:chat_friends/models/user.dart';
 import '../utils/api.dart';
-import 'image_viewer_screen.dart'; // Импорт экрана просмотра изображений
-
-import 'package:photo_view/photo_view.dart';
 import 'package:chat_friends/screens/image_viewer_screen.dart';
-
-import 'package:dio/dio.dart';
 import 'package:chat_friends/services/download_service.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 

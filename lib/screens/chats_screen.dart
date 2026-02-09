@@ -1,8 +1,4 @@
 import 'package:chat_friends/utils/local_unread_helper.dart';
-
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
 import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:chat_friends/services/api_service.dart';
@@ -252,122 +248,6 @@ class _ChatsScreenState extends State<ChatsScreen>
     }
   }
 
-
-
-
-
-Future<void> _testMarkRead() async {
-  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
-  const chatId = 466; // чат driving car, где есть пользователь 259
-
-  try {
-    final response = await http.post(
-      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/mark-read'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({'chat_id': chatId}),
-    );
-
-    print('MARK-READ STATUS: ${response.statusCode}');
-    print('MARK-READ BODY: ${response.body}');
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('mark-read: ${response.statusCode}'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    print('MARK-READ ERROR: $e');
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('mark-read error: $e'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-}
-
-
-Future<void> _testGetChats() async {
-  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
-
-  try {
-    final response = await http.get(
-      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/chats'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    print('CHATS STATUS: ${response.statusCode}');
-    print('CHATS BODY: ${response.body}');
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('chats: ${response.statusCode}'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    print('CHATS ERROR: $e');
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('chats error: $e'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-}
-
-Future<void> _testUnreadCount() async {
-  const token = 'user_259_e7f4d02c3f703f50ca87d790133e04f8';
-
-  try {
-    final response = await http.get(
-      Uri.parse('https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/unread-count'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    print('UNREAD STATUS: ${response.statusCode}');
-    print('UNREAD BODY: ${response.body}');
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('unread: ${response.statusCode}'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    print('UNREAD ERROR: $e');
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('unread error: $e'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-}
-
-
-
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -518,7 +398,6 @@ Future<void> _testUnreadCount() async {
       ),
     );
   }
-  // В классе _ChatsScreenState добавьте методы для подсчета
   int get _unreadPersonalCount {
     return _personalChats.where((chat) => chat.hasUnread).length;
   }
@@ -526,49 +405,4 @@ Future<void> _testUnreadCount() async {
   int get _unreadGroupCount {
     return _groupChats.where((chat) => chat.hasUnread).length;
   }
-
-  List<Chat> _addTestUnreadCounts(List<Chat> originalChats) {
-    return originalChats.map((chat) {
-      // Тестовые данные: делаем первые 2 личных и 1 групповой чат непрочитанными
-      bool makeUnread = false;
-      
-      if (!chat.isGroup) {
-        // Первые 2 личных чата
-        final personalIndex = originalChats
-            .where((c) => !c.isGroup)
-            .toList()
-            .indexOf(chat);
-        makeUnread = personalIndex < 2;
-      } else {
-        // Первый групповой чат
-        final groupIndex = originalChats
-            .where((c) => c.isGroup)
-            .toList()
-            .indexOf(chat);
-        makeUnread = groupIndex == 0;
-      }
-      
-      if (makeUnread) {
-        print('[TEST] Делаю чат ${chat.id} "${chat.name}" непрочитанным');
-        return Chat(
-          id: chat.id,
-          name: chat.name,
-          avatar: chat.avatar,
-          isGroup: chat.isGroup,
-          createdAt: chat.createdAt,
-          userIds: chat.userIds,
-          lastMessageId: chat.lastMessageId,
-          lastMessage: chat.lastMessage,
-          members: chat.members,
-          unreadCount: 3, // Тестовое значение
-          creator: chat.creator,
-        );
-      }
-      
-      return chat;
-    }).toList();
-  }
-
-
-  
 }
