@@ -445,23 +445,7 @@ Future<void> _testUnreadCount() async {
 
 
 
-          IconButton(
-            icon: Icon(Icons.analytics),
-            onPressed: () => LocalUnreadHelper.printStats(),
-            tooltip: 'Статистика',
-          ),
-
-          IconButton(
-            icon: Icon(Icons.delete),
-            onPressed: () async {
-              await LocalUnreadHelper.clearAll();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Данные очищены'))
-              );
-              _loadData();
-            },
-            tooltip: 'Очистить все',
-          ),
+          
 
 
 
@@ -473,27 +457,15 @@ Future<void> _testUnreadCount() async {
 
 
 
-    IconButton(
-      icon: Icon(Icons.mark_email_read),
-      onPressed: _testUnreadCount,
-      tooltip: 'Тест unread-count',
-    ),
+    
 
 
 
-    IconButton(
-      icon: Icon(Icons.list),
-      onPressed: _testGetChats,
-      tooltip: 'Тест chats',
-    ),
+    
 
 
 
-      IconButton(
-        icon: Icon(Icons.bug_report),
-        onPressed: _testMarkRead,
-        tooltip: 'Тест mark-read',
-      ),
+      
 
 
 
