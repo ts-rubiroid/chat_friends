@@ -44,24 +44,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
       try {
         String? avatarUrl;
         
-        // 1. Загружаем аватар
+        // 1. Загружаем аватар (до регистрации)
         if (_avatar != null) {
           print('Загружаю аватар...');
           avatarUrl = await ApiService.uploadAvatar(_avatar!);
           
           if (avatarUrl == null) {
             print('Аватар не загружен, продолжаем без него');
+          } else {
+            print('Аватар загружен: $avatarUrl');
           }
         }
         
-        // 2. Подготавливаем данные
+        // 2. Подготавливаем данные для регистрации
         final data = {
           'first_name': _firstNameController.text.trim(),
           'last_name': _lastNameController.text.trim(),
+          'middle_name': _middleNameController.text.trim(),
           'nickname': _nicknameController.text.isNotEmpty 
               ? _nicknameController.text.trim()
               : _firstNameController.text.trim(),
-          'avatar': avatarUrl ?? '', // URL или пустая строка
+          // ВАЖНО: передаём URL аватара в поле avatar, как ожидает chat_auth_register
+          'avatar': avatarUrl ?? '',
         };
 
         // 3. Регистрируем пользователя

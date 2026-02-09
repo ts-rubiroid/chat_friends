@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // Добавляем этот импорт
 import 'package:shared_preferences/shared_preferences.dart';
@@ -259,7 +258,20 @@ class ApiService {
     );
     
     final result = await _handleResponse(response);
-    return User.fromJson(result);
+
+    // Поддерживаем несколько форматов ответа (как в других методах)
+    if (result['success'] == true) {
+      final dynamic userJson = result['user'] ?? result['data'] ?? result['profile'];
+      if (userJson is Map<String, dynamic>) {
+        return User.fromJson(userJson);
+      }
+      // Иногда сервер может вернуть пользователя "плоско"
+      return User.fromJson(result);
+    }
+
+    // Ошибка
+    final err = result['error'] ?? result['message'] ?? 'Не удалось обновить профиль';
+    throw Exception(err.toString());
   }
 
   // === ЧАТЫ ===

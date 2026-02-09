@@ -116,22 +116,3 @@ user_id: 259
 
 ✅ Навигация между экранами
 
-❌ Что нужно исправить для WP
-❌ Переделать загрузку файлов (самое важное)
-
-❌ Добавить endpoints: unread-count, mark-read
-
-❌ Проверить поля: message_id → id
-
-❌ Тестировать токен формата user_{id}_{hash}
-
-🚀 Следующие шаги
-Прислать: create_chat_screen.dart, profile_screen.dart, chat_list_item.dart
-
-Исправить: ApiService.uploadFile() логику
-
-Добавить: Отсутствующие endpoints в ApiService
-
-Протестировать: Полный цикл с WP API
-
-Оценка: Приложение 90% готово. Основная работа - переделать загрузку файлов и добавить 2-3 missing endpoints.

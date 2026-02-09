@@ -13,6 +13,13 @@ import 'image_viewer_screen.dart'; // Импорт экрана просмотр
 import 'package:photo_view/photo_view.dart';
 import 'package:chat_friends/screens/image_viewer_screen.dart';
 
+import 'package:dio/dio.dart';
+import 'package:chat_friends/services/download_service.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+
+
+
+
 class ChatScreen extends StatefulWidget {
   final Chat chat;
 
@@ -317,29 +324,69 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
     
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Начинаем скачивание...')),
-      );
-      
-      print('Скачивание файла: ${message.fileUrl}');
-      print('Имя файла: ${message.displayFileName}');
-      print('Размер: ${message.formattedFileSize}');
-      
-      // TODO: Реализовать скачивание файла через download_service.dart
-      
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Показываем начальное сообщение
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Файл "${message.displayFileName}" скачан'),
+          content: Text('Начинаем скачивание "${message.displayFileName}"...'),
           duration: Duration(seconds: 2),
         ),
       );
+      
+      print('[ChatScreen] Скачивание файла: ${message.fileUrl}');
+      
+      // Скачиваем файл
+      final file = await DownloadService.downloadFile(
+        url: message.fileUrl,
+        fileName: message.displayFileName,
+        onProgress: (received, total) {
+          if (total != -1) {
+            final progress = (received / total * 100).toInt();
+            print('[ChatScreen] Прогресс скачивания: $progress%');
+          }
+        },
+      );
+      
+      if (file != null && await file.exists()) {
+        // Успешно скачан
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('✅ Файл "${message.displayFileName}" скачан'),
+            duration: Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Открыть',
+              onPressed: () async {
+                try {
+                  await DownloadService.openFile(file.path);
+                } catch (e) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Не удалось открыть файл: $e')),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+        
+        print('[ChatScreen] ✅ Файл успешно скачан: ${file.path}');
+      } else {
+        throw Exception('Файл не был сохранен');
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка скачивания: $e')),
+      print('[ChatScreen] ❌ Ошибка скачивания файла: $e');
+      
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ Ошибка скачивания: ${e.toString()}'),
+          duration: Duration(seconds: 4),
+        ),
       );
     }
   }
+
+
 
   // Открытие файла
   Future<void> _openFile(Message message) async {
@@ -371,30 +418,48 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Скачивание изображения
+
+  // Скачивание изображения (для полноэкранного просмотра)
   Future<void> _downloadImage(String imageUrl, String fileName) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Скачивание изображения...')),
-      );
-      
-      print('Скачивание изображения: $imageUrl');
-      print('Имя файла: $fileName');
-      
-      // TODO: Реализовать скачивание изображения через download_service.dart
-      
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(
-          content: Text('Изображение сохранено'),
+          content: Text('Скачивание изображения...'),
           duration: Duration(seconds: 2),
         ),
       );
+      
+      print('[ChatScreen] Скачивание изображения: $imageUrl');
+      
+      // Сохраняем в галерею
+      final success = await DownloadService.downloadImageToGallery(imageUrl);
+      
+      if (success) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('✅ Изображение сохранено в галерею'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+        print('[ChatScreen] ✅ Изображение сохранено в галерею');
+      } else {
+        throw Exception('Не удалось сохранить изображение');
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка скачивания: $e')),
+      print('[ChatScreen] ❌ Ошибка скачивания изображения: $e');
+      
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ Ошибка сохранения: ${e.toString()}'),
+          duration: Duration(seconds: 4),
+        ),
       );
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {

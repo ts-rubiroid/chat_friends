@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
+import 'package:chat_friends/services/download_service.dart'; // Добавлен импорт
 
 class ImageViewerScreen extends StatefulWidget {
   final String imageUrl;
@@ -86,15 +86,27 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> {
         SnackBar(content: Text('Скачивание изображения...')),
       );
       
-      // TODO: Реализовать скачивание изображения
       print('Скачивание изображения: ${widget.imageUrl}');
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Изображение сохранено в галерею')),
-      );
+      // Используем DownloadService
+      final success = await DownloadService.downloadImageToGallery(widget.imageUrl);
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Изображение сохранено в галерею'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        throw Exception('Не удалось сохранить изображение');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка скачивания: $e')),
+        SnackBar(
+          content: Text('❌ Ошибка скачивания: ${e.toString()}'),
+          duration: Duration(seconds: 4),
+        ),
       );
     }
   }
