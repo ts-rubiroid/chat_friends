@@ -20,6 +20,7 @@
 - Личные и групповые чаты
 - Текстовые сообщения, изображения, файлы (PDF, DOC и др.)
 - Просмотр и скачивание файлов, сохранение изображений в галерею
+- Отправка и предпросмотр видео и аудио файлов в чате
 
 ---
 
@@ -137,13 +138,19 @@ lib/
 
 ### 5.4 Загрузка файлов
 
-1. **Изображения и файлы в сообщениях:**  
-   - `ApiService.uploadFile(File)` → POST `/chat-api/v1/upload` (multipart, поле `file`)  
-   - Ответ: `{ success: true, file: { id, url, name, type, size } }`  
-   - Затем `ApiService.sendMessageWithFile(chatId, text, file, type)` — отправка с `image_url` или `file_url`.
+1. **Изображения и файлы (включая видео/аудио) в сообщениях:**  
+   - `ApiService.uploadFile(File)` → POST `/chat-api/v1/upload` (multipart, поле `file`).  
+   - На стороне WordPress в `chat_api_upload` разрешены, как минимум, следующие MIME-типы:  
+     - **Изображения:** `image/jpeg`, `image/png`, `image/gif`  
+     - **Документы/текст:** `application/pdf`, `text/plain`  
+     - **Видео:** `video/mp4`, `video/quicktime`, `video/webm`  
+     - **Аудио:** `audio/mpeg`, `audio/mp4`, `audio/aac`, `audio/wav`, `audio/ogg`, `audio/webm`  
+   - Успешный ответ: `{ success: true, file: { id, url, name, type, size, uploaded_at } }`.  
+   - Затем `ApiService.sendMessageWithFile(chatId, text, file, type)` — отправка с `image_url` (для `type = 'image'`) или `file_url` (для `type = 'file'`).  
+   - **Особенность:** видео и аудио в текущей версии всегда отправляются как `type = 'file'`; разграничение типов (`video`/`audio`/`document`) происходит на клиенте по `fileType` (MIME) и/или расширению файла.
 
 2. **Аватар при регистрации:**  
-   - `ApiService.uploadAvatar(File)` → тот же `/upload`  
+   - `ApiService.uploadAvatar(File)` → тот же `/upload`.  
    - URL аватара передаётся в `register` в поле `avatar`.
 
 ### 5.5 Специфика WordPress / ACF
@@ -171,9 +178,11 @@ lib/
 - `createChat(name, isGroup, {participants})` — создание чата
 - `getMessages(chatId)` — сообщения чата
 - `sendTextMessage(chatId, text)` — текстовое сообщение
-- `sendMessageWithFile(chatId, text, file, type)` — сообщение с файлом (image/file)
-- `uploadFile(file, {fileName})` — загрузка файла
-- `uploadAvatar(imageFile)` — загрузка аватара
+- `sendMessageWithFile(chatId, text, file, type)` — сообщение с файлом (image/file)  
+  - для `type = 'image'` сервер ожидает `image_url` и сохраняет значение в поле `image`;  
+  - для `type = 'file'` сервер ожидает `file_url` и сохраняет значение в поле `file` (это может быть документ, видео или аудио файл).  
+- `uploadFile(file, {fileName})` — загрузка файла (любой поддерживаемый тип: изображение, документ, видео или аудио).  
+- `uploadAvatar(imageFile)` — загрузка аватара.
 
 ### 6.2 MediaStorage (`lib/services/media_storage.dart`)
 
@@ -202,13 +211,24 @@ lib/
 - **LoginScreen:** Вход, регистрация, проверка обновлений APK.
 - **ChatsScreen:** Список чатов (вкладки «Личные» и «Групповые»), FAB → CreateChatScreen, иконка профиля → ProfileScreen.
 - **CreateChatScreen:** Выбор типа чата и участников, создание через `ApiService.createChat()`, возврат Chat.
-- **ChatScreen:** Сообщения, отправка текста и файлов, polling каждые 5 секунд.
+- **ChatScreen:** Сообщения, отправка текста и файлов (включая видео/аудио), polling каждые 5 секунд.
 
 ### 7.2 Потоки данных
 
 - **Регистрация:** RegisterScreen → uploadAvatar (если выбран) → register(avatar: url) → login → ChatsScreen.
 - **Создание чата:** ChatsScreen FAB → CreateChatScreen → createChat → ChatScreen с новым чатом.
-- **Отправка файла:** ChatScreen → uploadFile → sendMessageWithFile → MediaStorage.saveMediaForMessage.
+- **Отправка файла/медиа:**  
+  1. Пользователь в `ChatScreen` открывает меню вложений (кнопка слева от поля ввода) и выбирает:  
+     - фото из галереи,  
+     - фото с камеры,  
+     - видео из галереи,  
+     - аудио файл,  
+     - произвольный файл.  
+  2. Клиент формирует локальный предпросмотр (миниатюра/плитка/аудиоплеер) и ожидает подтверждения отправки.  
+  3. При отправке:  
+     - вызывается `ApiService.uploadFile(file)` (POST `/chat-api/v1/upload`),  
+     - далее `ApiService.sendMessageWithFile(chatId, text, file, type)` (для видео/аудио используется `type = 'file'`).  
+  4. Параллельно `MediaStorage.saveMediaForMessage(messageId, ...)` сохраняет локальные ссылки и метаданные, чтобы при последующих запросах сообщений можно было восстановить превью даже при неполном ответе сервера.
 
 ---
 
@@ -228,6 +248,9 @@ lib/
 - `open_filex` — открытие файлов
 - `image_gallery_saver_plus` — сохранение изображений в галерею
 
+- `video_player` — воспроизведение видео (экран `VideoViewerScreen`, превью видео-сообщений)
+- `just_audio` — воспроизведение аудио (виджет `AudioPlayerBubble` для аудио-сообщений)
+
 ---
 
 ## 9. Особенности реализации
@@ -241,7 +264,12 @@ lib/
 
 ## 10. Планируемые доработки
 
-1. **Отправка аудио и видео** — загрузка через `/upload`, сохранение в полях message (например, audio_url, video_url или обобщённое file с type). Добавить предпросмотр аудио/видео в чате (плеер, превью).
+1. ~~**Отправка аудио и видео** — загрузка через `/upload`, сохранение в полях message (например, audio_url, video_url или обобщённое file с type). Добавить предпросмотр аудио/видео в чате (плеер, превью).~~  
+   **РЕАЛИЗОВАНО:**  
+   - Загрузка аудио и видео через существующий endpoint `/chat-api/v1/upload` с расширенным списком MIME-типов.  
+   - Сохранение ссылок на медиа в полях `image`/`file` (для видео/аудио используется `file` + `fileType`).  
+   - В `ChatScreen` добавлено единое меню вложений (фото, камера, видео, аудио, файл) и предпросмотр выбранного файла перед отправкой.  
+   - Отправленные изображения получают полноэкранный просмотр (`ImageViewerScreen`), видео — экран просмотра (`VideoViewerScreen`), аудио — встроенный плеер (`AudioPlayerBubble`).  
 2. **Внешний вид UI** — оформление интерфейса: темы, цветовые схемы, отступы, типографика, анимации.
 
 ---

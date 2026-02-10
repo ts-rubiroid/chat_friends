@@ -1187,7 +1187,30 @@ function chat_api_upload($request) {
         return new WP_Error('file_too_large', 'Файл слишком большой (макс. 10MB)', ['status' => 400]);
     }
     
-    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain'];
+    // Разрешенные MIME-типы (расширено: добавлены видео и аудио)
+    $allowed_types = [
+        // images
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        // documents / text
+        'application/pdf',
+        'text/plain',
+        // video
+        'video/mp4',
+        'video/quicktime', // mov
+        'video/webm',
+        // audio
+        'audio/mpeg', // mp3
+        'audio/mp4',  // m4a
+        'audio/aac',
+        'audio/wav',
+        'audio/ogg',
+        'audio/webm',
+    ];
+
+    // mime_content_type() может возвращать неожиданные значения на некоторых хостингах,
+    // но в большинстве случаев подходит для проверки типов загружаемых медиа.
     $file_type = mime_content_type($file['tmp_name']);
     
     if (!in_array($file_type, $allowed_types)) {
@@ -1196,6 +1219,9 @@ function chat_api_upload($request) {
     
     require_once(ABSPATH . 'wp-admin/includes/file.php');
     require_once(ABSPATH . 'wp-admin/includes/image.php');
+    // ВАЖНО: для аудио/видео WordPress может вызывать wp_read_audio_metadata()/wp_read_video_metadata()
+    // которые определены в media.php (и могут не быть подключены).
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
     
     $upload_overrides = ['test_form' => false];
     $movefile = wp_handle_upload($file, $upload_overrides);
@@ -1214,8 +1240,22 @@ function chat_api_upload($request) {
     ];
     
     $attach_id = wp_insert_attachment($attachment, $movefile['file']);
-    $attach_data = wp_generate_attachment_metadata($attach_id, $movefile['file']);
-    wp_update_attachment_metadata($attach_id, $attach_data);
+    // Генерация метаданных нужна в основном для изображений (превью/размеры).
+    // На некоторых хостингах генерация метаданных аудио может падать (нет getID3/нет функций),
+    // поэтому делаем её безопасно и условно.
+    $should_generate_metadata = false;
+    if (function_exists('wp_attachment_is_image') && wp_attachment_is_image($attach_id)) {
+        $should_generate_metadata = true;
+    } else if (is_string($file_type) && strpos($file_type, 'video/') === 0) {
+        $should_generate_metadata = true;
+    }
+
+    if ($should_generate_metadata && function_exists('wp_generate_attachment_metadata')) {
+        $attach_data = wp_generate_attachment_metadata($attach_id, $movefile['file']);
+        if (!is_wp_error($attach_data)) {
+            wp_update_attachment_metadata($attach_id, $attach_data);
+        }
+    }
     
     $file_url = wp_get_attachment_url($attach_id);
     

@@ -7,10 +7,10 @@ import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
 import 'package:chat_friends/models/user.dart';
-import '../utils/api.dart';
 import 'package:chat_friends/screens/image_viewer_screen.dart';
+import 'package:chat_friends/screens/video_viewer_screen.dart';
 import 'package:chat_friends/services/download_service.dart';
-import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:chat_friends/widgets/audio_player_bubble.dart';
 
 
 
@@ -29,8 +29,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _focusNode = FocusNode();
   List<Message> _messages = [];
   bool _isLoading = true;
-  File? _image;
-  File? _file;
+  _PendingAttachment? _pendingAttachment;
   bool _isSending = false;
   User? _currentUser;
 
@@ -148,33 +147,168 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  Future<void> _pickImage() async {
+  String _getExtension(String pathOrName) {
+    final idx = pathOrName.lastIndexOf('.');
+    if (idx == -1) return '';
+    return pathOrName.substring(idx + 1).toLowerCase();
+  }
+
+  bool _isVideoByNameOrMime({required String nameOrPath, String? mime}) {
+    final ext = _getExtension(nameOrPath);
+    final m = (mime ?? '').toLowerCase();
+    if (m.startsWith('video/')) return true;
+    return ['mp4', 'mov', 'webm', 'mkv', 'avi'].contains(ext);
+  }
+
+  bool _isAudioByNameOrMime({required String nameOrPath, String? mime}) {
+    final ext = _getExtension(nameOrPath);
+    final m = (mime ?? '').toLowerCase();
+    if (m.startsWith('audio/')) return true;
+    return ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac', 'opus'].contains(ext);
+  }
+
+  Future<void> _pickPhotoFromGallery() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    
+
     if (pickedFile != null) {
       setState(() {
-        _image = File(pickedFile.path);
-        _file = null;
+        _pendingAttachment = _PendingAttachment(
+          type: _PendingAttachmentType.image,
+          file: File(pickedFile.path),
+        );
       });
       _focusNode.requestFocus();
     }
   }
 
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    
-    if (result != null) {
+  Future<void> _takePhotoWithCamera() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera);
+
+    if (pickedFile != null) {
       setState(() {
-        _file = File(result.files.single.path!);
-        _image = null;
+        _pendingAttachment = _PendingAttachment(
+          type: _PendingAttachmentType.image,
+          file: File(pickedFile.path),
+        );
       });
       _focusNode.requestFocus();
     }
+  }
+
+  Future<void> _pickVideoFromGallery() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickVideo(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _pendingAttachment = _PendingAttachment(
+          type: _PendingAttachmentType.video,
+          file: File(pickedFile.path),
+        );
+      });
+      _focusNode.requestFocus();
+    }
+  }
+
+  Future<void> _pickAudioFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac', 'opus'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      setState(() {
+        _pendingAttachment = _PendingAttachment(
+          type: _PendingAttachmentType.audio,
+          file: File(result.files.single.path!),
+        );
+      });
+      _focusNode.requestFocus();
+    }
+  }
+
+  Future<void> _pickAnyFile() async {
+    final result = await FilePicker.platform.pickFiles();
+
+    if (result != null && result.files.single.path != null) {
+      final f = result.files.single;
+      final nameOrPath = f.name.isNotEmpty ? f.name : f.path!;
+      final pickedType = _isVideoByNameOrMime(nameOrPath: nameOrPath, mime: null)
+          ? _PendingAttachmentType.video
+          : _isAudioByNameOrMime(nameOrPath: nameOrPath, mime: null)
+              ? _PendingAttachmentType.audio
+              : _PendingAttachmentType.file;
+
+      setState(() {
+        _pendingAttachment = _PendingAttachment(type: pickedType, file: File(f.path!));
+      });
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _showAttachmentPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_library, color: Colors.blue),
+              title: Text('Выбрать фото'),
+              subtitle: Text('Из галереи'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickPhotoFromGallery();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_camera, color: Colors.green),
+              title: Text('Сделать фото'),
+              subtitle: Text('Камера'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _takePhotoWithCamera();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.videocam, color: Colors.deepPurple),
+              title: Text('Выбрать видео'),
+              subtitle: Text('Из галереи'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickVideoFromGallery();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.audiotrack, color: Colors.orange),
+              title: Text('Выбрать аудио'),
+              subtitle: Text('MP3, M4A, WAV и др.'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickAudioFile();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.attach_file, color: Colors.grey[700]),
+              title: Text('Выбрать файл'),
+              subtitle: Text('Любой тип'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickAnyFile();
+              },
+            ),
+            SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.isEmpty && _image == null && _file == null) {
+    if (_messageController.text.isEmpty && _pendingAttachment == null) {
       return;
     }
 
@@ -189,18 +323,27 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       Message message;
       
-      if (_image != null) {
+      if (_pendingAttachment != null && _pendingAttachment!.type == _PendingAttachmentType.image) {
         message = await ApiService.sendMessageWithFile(
           widget.chat.id,
           text.isNotEmpty ? text : 'Изображение',
-          _image!,
+          _pendingAttachment!.file,
           'image',
         );
-      } else if (_file != null) {
+      } else if (_pendingAttachment != null) {
+        final attachmentType = _pendingAttachment!.type;
+        final defaultText = attachmentType == _PendingAttachmentType.video
+            ? 'Видео'
+            : attachmentType == _PendingAttachmentType.audio
+                ? 'Аудио'
+                : 'Файл';
+
         message = await ApiService.sendMessageWithFile(
           widget.chat.id,
-          text.isNotEmpty ? text : 'Файл',
-          _file!,
+          text.isNotEmpty ? text : defaultText,
+          _pendingAttachment!.file,
+          // ВАЖНО: на бэкенде сейчас есть только поля image/file,
+          // поэтому видео/аудио отправляем как "file" и различаем по MIME/расширению на клиенте.
           'file',
         );
       } else {
@@ -215,8 +358,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _messages.add(message);
-          _image = null;
-          _file = null;
+          _pendingAttachment = null;
           _isSending = false;
         });
         _markChatAsRead();
@@ -242,6 +384,24 @@ class _ChatScreenState extends State<ChatScreen> {
     final fileType = message.fileType?.toLowerCase() ?? '';
     final fileName = message.displayFileName.toLowerCase();
     
+    if (fileType.startsWith('video/') ||
+        fileName.endsWith('.mp4') ||
+        fileName.endsWith('.mov') ||
+        fileName.endsWith('.webm') ||
+        fileName.endsWith('.mkv') ||
+        fileName.endsWith('.avi')) {
+      return Icon(Icons.play_circle_filled, size: 36, color: Colors.deepPurple);
+    }
+    if (fileType.startsWith('audio/') ||
+        fileName.endsWith('.mp3') ||
+        fileName.endsWith('.m4a') ||
+        fileName.endsWith('.aac') ||
+        fileName.endsWith('.wav') ||
+        fileName.endsWith('.ogg') ||
+        fileName.endsWith('.flac') ||
+        fileName.endsWith('.opus')) {
+      return Icon(Icons.audiotrack, size: 36, color: Colors.orange);
+    }
     if (fileType.contains('image') || 
         fileName.endsWith('.jpg') || 
         fileName.endsWith('.jpeg') || 
@@ -386,11 +546,26 @@ class _ChatScreenState extends State<ChatScreen> {
   // Открытие файла
   Future<void> _openFile(Message message) async {
     try {
-      print('Открытие файла: ${message.fileUrl}');
-      // TODO: Реализовать открытие файла через open_filex
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Открытие файла: ${message.displayFileName}')),
+      if (!message.hasFile || message.fileUrl.isEmpty) return;
+
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Скачивание "${message.displayFileName}" для открытия...'),
+          duration: Duration(seconds: 2),
+        ),
       );
+
+      final file = await DownloadService.downloadFile(
+        url: message.fileUrl,
+        fileName: message.displayFileName,
+      );
+
+      if (file != null && await file.exists()) {
+        await DownloadService.openFile(file.path);
+      } else {
+        throw Exception('Файл не был сохранен');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Не удалось открыть файл: $e')),
@@ -414,47 +589,256 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
 
-  // Скачивание изображения (для полноэкранного просмотра)
-  Future<void> _downloadImage(String imageUrl, String fileName) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
-    try {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Скачивание изображения...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      print('[ChatScreen] Скачивание изображения: $imageUrl');
-      
-      // Сохраняем в галерею
-      final success = await DownloadService.downloadImageToGallery(imageUrl);
-      
-      if (success) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('✅ Изображение сохранено в галерею'),
-            duration: Duration(seconds: 3),
+  String _basename(String path) {
+    final parts = path.split(RegExp(r'[\/\\\\]'));
+    return parts.isNotEmpty ? parts.last : path;
+  }
+
+  Widget _buildPendingAttachmentPreview(_PendingAttachment attachment) {
+    final name = _basename(attachment.file.path);
+
+    Widget preview;
+    switch (attachment.type) {
+      case _PendingAttachmentType.image:
+        preview = ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.file(
+            attachment.file,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              width: 64,
+              height: 64,
+              color: Colors.grey.shade300,
+              child: Icon(Icons.broken_image),
+            ),
           ),
         );
-        print('[ChatScreen] ✅ Изображение сохранено в галерею');
-      } else {
-        throw Exception('Не удалось сохранить изображение');
-      }
-    } catch (e) {
-      print('[ChatScreen] ❌ Ошибка скачивания изображения: $e');
-      
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('❌ Ошибка сохранения: ${e.toString()}'),
-          duration: Duration(seconds: 4),
+        break;
+      case _PendingAttachmentType.video:
+        preview = GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideoViewerScreen(
+                  filePath: attachment.file.path,
+                  title: name,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.deepPurple.withOpacity(0.25)),
+            ),
+            child: Center(
+              child: Icon(Icons.play_circle_filled, color: Colors.deepPurple, size: 32),
+            ),
+          ),
+        );
+        break;
+      case _PendingAttachmentType.audio:
+        preview = Expanded(
+          child: AudioPlayerBubble(
+            title: name,
+            filePath: attachment.file.path,
+            dense: true,
+          ),
+        );
+        break;
+      case _PendingAttachmentType.file:
+        preview = Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.insert_drive_file, color: Colors.grey.shade800),
+        );
+        break;
+    }
+
+    return Row(
+      children: [
+        if (attachment.type != _PendingAttachmentType.audio) preview,
+        if (attachment.type != _PendingAttachmentType.audio) SizedBox(width: 10),
+        if (attachment.type != _PendingAttachmentType.audio)
+          Expanded(
+            child: Text(
+              name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        if (attachment.type == _PendingAttachmentType.audio) preview,
+        IconButton(
+          icon: Icon(Icons.close),
+          onPressed: () {
+            setState(() {
+              _pendingAttachment = null;
+            });
+            _focusNode.requestFocus();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFileMessageBlock(Message message) {
+    final fileName = message.displayFileName;
+    final mime = message.fileType;
+    final isVideo = _isVideoByNameOrMime(nameOrPath: fileName, mime: mime);
+    final isAudio = _isAudioByNameOrMime(nameOrPath: fileName, mime: mime);
+
+    if (isVideo) {
+      return Container(
+        margin: EdgeInsets.only(bottom: 8),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideoViewerScreen(
+                  url: message.fileUrl,
+                  title: fileName,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.deepPurple.withOpacity(0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.play_circle_filled, size: 40, color: Colors.deepPurple),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fileName,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            'Видео',
+                            style: TextStyle(fontSize: 12, color: Colors.deepPurple),
+                          ),
+                          if (message.formattedFileSize.isNotEmpty) ...[
+                            Text(' • ', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            Text(
+                              message.formattedFileSize,
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.more_vert, color: Colors.grey.shade700),
+                  onPressed: () async => _handleFileTap(message),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
+
+    if (isAudio) {
+      return Container(
+        margin: EdgeInsets.only(bottom: 8),
+        child: AudioPlayerBubble(
+          title: fileName,
+          url: message.fileUrl,
+          dense: false,
+          trailing: IconButton(
+            icon: Icon(Icons.more_vert, color: Colors.grey.shade700),
+            onPressed: () async => _handleFileTap(message),
+          ),
+        ),
+      );
+    }
+
+    // Fallback: обычный блок файлов (документы и т.д.)
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () async {
+          await _handleFileTap(message);
+        },
+        child: Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              _getFileIcon(message),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fileName,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    if (message.formattedFileSize.isNotEmpty)
+                      Text(
+                        message.formattedFileSize,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    if (message.fileType != null)
+                      Text(
+                        message.fileType!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.download, color: Colors.blue),
+                onPressed: () async {
+                  await _downloadFile(message);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -464,34 +848,11 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          if (_image != null || _file != null)
+          if (_pendingAttachment != null)
             Container(
               padding: EdgeInsets.all(10),
               color: Colors.grey.shade200,
-              child: Row(
-                children: [
-                  Icon(_image != null ? Icons.image : Icons.insert_drive_file),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _image?.path.split('/').last ??
-                      _file?.path.split('/').last ??
-                      '',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close),
-                    onPressed: () {
-                      setState(() {
-                        _image = null;
-                        _file = null;
-                      });
-                      _focusNode.requestFocus();
-                    },
-                  ),
-                ],
-              ),
+              child: _buildPendingAttachmentPreview(_pendingAttachment!),
             ),
           
           Expanded(
@@ -667,67 +1028,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                         
                                         // БЛОК ДЛЯ ФАЙЛОВ
                                         if (hasFile && fileUrl.isNotEmpty)
-                                          Container(
-                                            margin: EdgeInsets.only(bottom: 8),
-                                            child: GestureDetector(
-                                              onTap: () async {
-                                                await _handleFileTap(message);
-                                              },
-                                              child: Container(
-                                                padding: EdgeInsets.all(12),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.shade100,
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  border: Border.all(color: Colors.grey.shade300),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    // Иконка в зависимости от типа файла
-                                                    _getFileIcon(message),
-                                                    SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Text(
-                                                            message.displayFileName,
-                                                            overflow: TextOverflow.ellipsis,
-                                                            style: TextStyle(
-                                                              fontWeight: FontWeight.bold,
-                                                              fontSize: 14,
-                                                            ),
-                                                          ),
-                                                          SizedBox(height: 4),
-                                                          if (message.formattedFileSize.isNotEmpty)
-                                                            Text(
-                                                              message.formattedFileSize,
-                                                              style: TextStyle(
-                                                                fontSize: 12,
-                                                                color: Colors.grey.shade600,
-                                                              ),
-                                                            ),
-                                                          if (message.fileType != null)
-                                                            Text(
-                                                              message.fileType!,
-                                                              style: TextStyle(
-                                                                fontSize: 11,
-                                                                color: Colors.grey.shade500,
-                                                              ),
-                                                            ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    IconButton(
-                                                      icon: Icon(Icons.download, color: Colors.blue),
-                                                      onPressed: () async {
-                                                        await _downloadFile(message);
-                                                      },
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
+                                          _buildFileMessageBlock(message),
                                         
                                         // ТЕКСТ СООБЩЕНИЯ
                                         if (message.text?.isNotEmpty == true)
@@ -764,15 +1065,9 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.image),
-                  onPressed: _pickImage,
-                  tooltip: 'Фото или галерея',
-                ),
-                
-                IconButton(
-                  icon: Icon(Icons.attach_file),
-                  onPressed: _pickFile,
-                  tooltip: 'Прикрепить файл',
+                  icon: Icon(Icons.add),
+                  onPressed: _showAttachmentPickerSheet,
+                  tooltip: 'Вложение',
                 ),
                 
                 Expanded(
@@ -810,4 +1105,13 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+}
+
+enum _PendingAttachmentType { image, video, audio, file }
+
+class _PendingAttachment {
+  final _PendingAttachmentType type;
+  final File file;
+
+  _PendingAttachment({required this.type, required this.file});
 }
