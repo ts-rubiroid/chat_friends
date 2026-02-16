@@ -189,6 +189,8 @@ function chat_api_get_last_message($chat_id) {
     
     $message = $messages[0];
     return [
+        'id' => (int) $message->ID,
+        'message_id' => (int) $message->ID,
         'text' => get_field('text', $message->ID),
         'sender_id' => get_field('sender', $message->ID),
         'created_at' => get_field('created_at', $message->ID)
@@ -396,6 +398,8 @@ function chat_api_get_chats($request) {
             }
         }
         
+        $last_message = chat_api_get_last_message($chat_id);
+        $last_message_id = !empty($last_message['id']) ? (int) $last_message['id'] : 0;
         $result[] = [
             'id' => $chat_id,
             'name' => $chat_name,
@@ -404,7 +408,8 @@ function chat_api_get_chats($request) {
             'members_count' => is_array($members) ? count($members) : 0,
             'members' => $members_info,
             'created_at' => get_field('created_at', $chat_id),
-            'last_message' => chat_api_get_last_message($chat_id)
+            'last_message_id' => $last_message_id,
+            'last_message' => $last_message
         ];
     }
     

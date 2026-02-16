@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../config/odata_config.dart';
+import '../../config/odata_config_repository.dart';
 import '../../data/onec_odata_client.dart';
 import '../../models/spare_part.dart';
+import '../../utils/odata_logger.dart';
+import '../settings/odata_settings_screen.dart';
 import '../stats/catalog_stats_screen.dart';
-// import '../debug/odata_diagnostics_screen.dart';
 import 'spare_part_details_screen.dart';
 
 /// Главный экран: вкладка каталога и вкладка статистики.
@@ -17,7 +20,11 @@ class SparePartsApp extends StatefulWidget {
 class _SparePartsAppState extends State<SparePartsApp>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  late final OnecOdataClient _client;
+  final OdataConfigRepository _configRepository = OdataConfigRepository();
+
+  OnecOdataClient? _client;
+  OdataConfig? _config;
+  bool _configLoading = true;
 
   List<SparePart>? _items;
   Map<String, double>? _pricesByNomen;
@@ -29,41 +36,116 @@ class _SparePartsAppState extends State<SparePartsApp>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadConfigAndData();
+  }
 
-    // TODO: при необходимости вынести в экран настроек.
-    _client = const OnecOdataClient(
-      baseUrl:
-          'http://172.22.0.62/1R82821/1R82821_AVTOSERV30_73qj8uuuxp/odata/standard.odata',
-      username: 'Администратор',
-      password: '',
-    );
+  static String _formatErrorMessage(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('socketexception') ||
+        s.contains('connection') ||
+        s.contains('failed host lookup') ||
+        s.contains('network is unreachable')) {
+      return 'Нет связи с сервером. Проверьте интернет и URL в настройках. '
+          'Убедитесь, что URL доступен с этого устройства (не используйте localhost на телефоне).';
+    }
+    if (s.contains('401') || s.contains('403')) {
+      return 'Неверный логин или пароль 1С. Проверьте настройки.';
+    }
+    if (s.contains('cleartext') || s.contains('operation not permitted')) {
+      return 'HTTP заблокирован Android. Используйте HTTPS-URL в настройках или прокси с HTTPS.';
+    }
+    if (s.contains('timeout') || s.contains('превышено время')) {
+      return 'Превышено время ожидания ответа. Сервер 1С долго не отвечает. '
+          'Проверьте доступность сервера и интернет.';
+    }
+    if (s.contains('connection refused') || s.contains('connection reset')) {
+      return 'Сервер недоступен. Проверьте URL и что сервер 1С запущен.';
+    }
+    return 'Ошибка: $e';
+  }
 
-    _loadData();
+  Future<void> _loadConfigAndData() async {
+    setState(() {
+      _configLoading = true;
+      _error = null;
+    });
+    try {
+      OdataLogger.logInfo('Загрузка конфигурации из хранилища');
+      final config = await _configRepository.load();
+      if (!mounted) return;
+      OdataLogger.logInfo('Конфиг загружен: baseUrl=${config.baseUrl}, username=${config.username}');
+      setState(() {
+        _config = config;
+        _client = OnecOdataClient(
+          baseUrl: config.baseUrl,
+          username: config.username,
+          password: config.password,
+        );
+        _configLoading = false;
+      });
+      _loadData();
+    } catch (e, stackTrace) {
+      OdataLogger.logError('_loadConfigAndData', e, stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() {
+        _configLoading = false;
+        _error = Exception('Не удалось загрузить настройки: $e');
+      });
+    }
   }
 
   Future<void> _loadData() async {
+    final client = _client;
+    if (client == null) {
+      OdataLogger.logWarning('_loadData вызван, но клиент не инициализирован');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
     });
 
+    final stopwatch = Stopwatch()..start();
+    OdataLogger.logInfo('=== Начало загрузки данных каталога ===');
+
     try {
-      final items = await _client.loadCatalogNomenklatura();
+      OdataLogger.logInfo('Загрузка дерева «Кронштейны»...');
+      final items = await client.loadKronshteinyTree();
+      OdataLogger.logInfo('Дерево загружено: ${items.length} элементов');
 
       // Параллельно подтягиваем цены и остатки.
-      final pricesFuture = _client.loadPrices();
-      final stocksFuture = _client.loadStocks();
+      OdataLogger.logInfo('Параллельная загрузка цен и остатков...');
+      final pricesFuture = client.loadPrices();
+      final stocksFuture = client.loadStocks();
 
       final prices = await pricesFuture;
       final stocks = await stocksFuture;
 
+      stopwatch.stop();
+      OdataLogger.logInfo(
+        '=== Загрузка завершена за ${stopwatch.elapsedMilliseconds}ms: '
+        '${items.length} позиций, ${prices.length} цен, ${stocks.length} остатков ===',
+      );
+
+      if (!mounted) return;
       setState(() {
         _items = items;
         _pricesByNomen = prices;
         _stocksByNomen = stocks;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      stopwatch.stop();
+      OdataLogger.logError(
+        '_loadData',
+        e,
+        stackTrace: stackTrace,
+      );
+      OdataLogger.logInfo(
+        'Загрузка завершилась ошибкой через ${stopwatch.elapsedMilliseconds}ms',
+      );
+      if (!mounted) return;
       setState(() {
         _error = e;
         _loading = false;
@@ -86,6 +168,24 @@ class _SparePartsAppState extends State<SparePartsApp>
         title: const Text('Каталог запчастей'),
         actions: [
           IconButton(
+            tooltip: 'Настройки 1С',
+            onPressed: _client == null
+                ? null
+                : () async {
+                    final saved = await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => OdataSettingsScreen(
+                          configRepository: _configRepository,
+                          initialConfig:
+                              _config ?? OdataConfig.defaultConfig,
+                        ),
+                      ),
+                    );
+                    if (saved == true && mounted) _loadConfigAndData();
+                  },
+            icon: const Icon(Icons.settings),
+          ),
+          IconButton(
             tooltip: 'Обновить данные',
             onPressed: _loadData,
             icon: const Icon(Icons.refresh),
@@ -103,11 +203,16 @@ class _SparePartsAppState extends State<SparePartsApp>
   }
 
   Widget _buildBody(ThemeData theme) {
+    if (_configLoading || _client == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
+      final message = _formatErrorMessage(_error!);
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -120,7 +225,7 @@ class _SparePartsAppState extends State<SparePartsApp>
               ),
               const SizedBox(height: 8),
               Text(
-                'Ошибка: $_error',
+                message,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.error),
                 textAlign: TextAlign.center,
@@ -149,7 +254,7 @@ class _SparePartsAppState extends State<SparePartsApp>
       children: [
         _CatalogTreeView(
           items: items,
-          client: _client,
+          client: _client!,
           pricesByNomen: prices,
           stocksByNomen: stocks,
         ),
@@ -419,21 +524,6 @@ class _CatalogTreeViewState extends State<_CatalogTreeView> {
     );
   }
 
-  Widget? _buildSubtitle(SparePart item) {
-    final parts = <String>[];
-    if (item.article?.isNotEmpty == true) {
-      parts.add('Артикул: ${item.article}');
-    }
-    if (item.comment?.isNotEmpty == true) {
-      parts.add(item.comment!);
-    }
-    if (parts.isEmpty) return null;
-    return Text(
-      parts.join(' · '),
-      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-    );
-  }
-
   Widget _buildItemTile(BuildContext context, SparePart item) {
     final price = widget.pricesByNomen[item.refKey];
     final stock = widget.stocksByNomen[item.refKey];
@@ -512,6 +602,7 @@ class _CatalogTreeViewState extends State<_CatalogTreeView> {
 
 }
 
+/// Временно показываем иконку шестерёнки вместо загрузки картинок из 1С.
 class _Thumbnail extends StatelessWidget {
   final OnecOdataClient client;
   final SparePart item;
@@ -520,29 +611,8 @@ class _Thumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Если у позиции нет прикреплённой картинки — показываем иконку.
-    if (item.pictureFileKey == null) {
-      return const CircleAvatar(
-        child: Icon(Icons.build),
-      );
-    }
-
-    final url = client.buildNomenklaturaThumbnailUrl(item.refKey);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        url,
-        // Важно: не просим JSON, иначе сервер может вернуть не-картинку.
-        width: 44,
-        height: 44,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const CircleAvatar(
-            child: Icon(Icons.broken_image),
-          );
-        },
-      ),
+    return const CircleAvatar(
+      child: Icon(Icons.build),
     );
   }
 }

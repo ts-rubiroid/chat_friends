@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'package:chat_friends/utils/local_unread_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:chat_friends/services/api_service.dart';
+import 'package:chat_friends/services/notification_service.dart';
+import 'package:chat_friends/services/background_notification_task.dart';
+import 'package:chat_friends/services/background_fetch_service.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/user.dart';
 import 'package:chat_friends/widgets/chat_list_item.dart';
@@ -15,7 +19,7 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<Chat> _chats = [];
   List<User> _allUsers = [];
   User? _currentUser;
@@ -29,26 +33,92 @@ class _ChatsScreenState extends State<ChatsScreen>
 
 
   // ЭТИ ПОЛЯ ДЛЯ ЛОКАЛЬНЫХ НЕПРОЧИТАННЫХ
-  // Map<int, int> _lastSeenByChat = {}; // chatId -> lastSeenMessageId
   Map<int, bool> _hasUnreadByChat = {}; // chatId -> hasUnread
   bool _hasUnreadPersonal = false;
   bool _hasUnreadGroup = false;
 
-
-
-
+  /// Для уведомлений о новых сообщениях: последний известный id последнего сообщения по чату.
+  Map<int, int?> _lastKnownLastMessageId = {};
+  Timer? _notificationTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkPendingNotificationChat());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPendingNotificationChat();
+    }
+  }
+
+  /// Если приложение открыто по тапу на уведомление — просто сбрасываем флаг (экран списка чатов уже показан).
+  void _checkPendingNotificationChat() {
+    if (!NotificationService.pendingOpenChatsList || !mounted) return;
+    NotificationService.pendingOpenChatsList = false;
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationTimer?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Опрос новых сообщений для уведомлений (когда пользователь не в этом чате).
+  Future<void> _checkNewMessages() async {
+    if (!mounted) return;
+    if (_currentUser == null) {
+      print('[Notify] _checkNewMessages: пропуск — _currentUser == null');
+      return;
+    }
+    try {
+      final chats = await ApiService.getChats();
+      if (!mounted) return;
+      print('[Notify] _checkNewMessages: получено ${chats.length} чатов, currentChatId=${NotificationService.currentChatId}');
+      for (final chat in chats) {
+        final lastMsg = chat.lastMessage;
+        final effectiveId = chat.lastMessageId ?? lastMsg?.id ?? 0;
+        final knownId = _lastKnownLastMessageId[chat.id];
+        if (lastMsg == null) {
+          _lastKnownLastMessageId[chat.id] = effectiveId != 0 ? effectiveId : null;
+          continue;
+        }
+        if (knownId != null && effectiveId != 0 && knownId == effectiveId) {
+          continue;
+        }
+        if (chat.id == NotificationService.currentChatId) {
+          print('[Notify] чат ${chat.id} — открыт сейчас, не уведомляем');
+          _lastKnownLastMessageId[chat.id] = effectiveId != 0 ? effectiveId : knownId;
+          continue;
+        }
+        if (lastMsg.senderId == _currentUser!.id) {
+          _lastKnownLastMessageId[chat.id] = effectiveId != 0 ? effectiveId : knownId;
+          continue;
+        }
+        print('[Notify] НОВОЕ СООБЩЕНИЕ: чат ${chat.id} "${chat.name}", msgId=$effectiveId, показываем уведомление');
+        await NotificationService.showNewMessageNotification(
+          chat: chat,
+          message: lastMsg,
+        );
+        if (!mounted) return;
+        _lastKnownLastMessageId[chat.id] = effectiveId != 0 ? effectiveId : knownId;
+      }
+      for (final chat in chats) {
+        final id = chat.lastMessageId ?? chat.lastMessage?.id;
+        if (id != null && id != 0) _lastKnownLastMessageId[chat.id] = id;
+      }
+      persistNotificationState(_lastKnownLastMessageId, _currentUser?.id);
+    } catch (e, st) {
+      print('[Notify] _checkNewMessages ОШИБКА: $e');
+      print('[Notify] $st');
+    }
   }
 
   // Разделение чатов на личные и групповые
@@ -104,10 +174,23 @@ class _ChatsScreenState extends State<ChatsScreen>
       });
       
       _categorizeChats();
-      
-      // ДОБАВЬТЕ ЭТУ СТРОКУ: Загружаем локальные статусы непрочитанных
+
       await _loadUnreadStatus();
-      
+
+      if (mounted) {
+        for (final c in _chats) {
+          final id = c.lastMessageId ?? c.lastMessage?.id;
+          if (id != null && id != 0) _lastKnownLastMessageId[c.id] = id;
+        }
+        persistNotificationState(_lastKnownLastMessageId, _currentUser?.id);
+        await configureAndStartBackgroundFetch();
+        print('[Notify] Таймер опроса уведомлений запущен (каждые 5 сек), чатов: ${_chats.length}, известных lastId: ${_lastKnownLastMessageId.length}');
+        _notificationTimer?.cancel();
+        _notificationTimer = Timer.periodic(
+          const Duration(seconds: 5),
+          (_) => _checkNewMessages(),
+        );
+      }
     } catch (e) {
       print('Ошибка загрузки данных: $e');
       setState(() { _isLoading = false; });

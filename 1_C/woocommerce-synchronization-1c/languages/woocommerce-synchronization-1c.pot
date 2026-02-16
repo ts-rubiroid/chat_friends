@@ -1,0 +1,357 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: WooCommerce - 1C - Data Exchange\n"
+"POT-Creation-Date: 2019-07-24 12:03+0300\n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.0.6\n"
+"X-Poedit-Basepath: ..\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n"
+"%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Poedit-KeywordsList: esc_html__;esc_html_e;esc_attr_e\n"
+"X-Poedit-SearchPath-0: includes\n"
+"X-Poedit-SearchPath-1: admin\n"
+"X-Poedit-SearchPath-2: exchange-process\n"
+"X-Poedit-SearchPath-3: woocommerce-synchronization-1c.php\n"
+
+#: admin/MetaBox.php:27
+msgid "1C ID"
+msgstr ""
+
+#: admin/SettingsPage.php:41 admin/SettingsPage.php:42
+msgid "1C Data Exchange"
+msgstr ""
+
+#: admin/SettingsPage.php:86
+msgid "Settings have been saved."
+msgstr ""
+
+#: admin/SettingsPage.php:129
+msgid "Sync settings with 1C"
+msgstr ""
+
+#: admin/SettingsPage.php:133
+msgid "Plugin documentation: "
+msgstr ""
+
+#: admin/SettingsPage.php:135
+msgid "open"
+msgstr ""
+
+#: admin/SettingsPage.php:136
+msgid "Or open the folder `documentation` in the plugin and open index.html"
+msgstr ""
+
+#: admin/SettingsPage.php:148
+msgid "Additionally"
+msgstr ""
+
+#: admin/SettingsPage.php:158
+msgid "Enable exchange"
+msgstr ""
+
+#: admin/SettingsPage.php:161
+msgid "If disabled, no exchange will be possible."
+msgstr ""
+
+#: admin/SettingsPage.php:167
+msgid "Product / Image Owner"
+msgstr ""
+
+#: admin/SettingsPage.php:184
+msgid "Price Type:"
+msgstr ""
+
+#: admin/SettingsPage.php:206
+msgid "Price Type Code"
+msgstr ""
+
+#: admin/SettingsPage.php:210
+msgid "Price Type Name"
+msgstr ""
+
+#: admin/SettingsPage.php:217
+msgid "Type of prices in 1C, which will be used as the value of the products."
+msgstr ""
+
+#: admin/SettingsPage.php:231
+msgid "Use only specified price type"
+msgstr ""
+
+#: admin/SettingsPage.php:234
+msgid ""
+"If it is enabled, then at the same time, if there is no such type of prices "
+"in the offer, then the product remains with an empty price."
+msgstr ""
+
+#: admin/SettingsPage.php:240
+msgid "File part size:"
+msgstr ""
+
+#: admin/SettingsPage.php:249
+msgid ""
+"The maximum size of the part of the exchange files transmitted from 1C (in "
+"bytes)."
+msgstr ""
+
+#: admin/SettingsPage.php:258
+msgid "Script running time (second):"
+msgstr ""
+#: admin/SettingsPage.php:265
+msgid "Maximum time the sync script runs (in seconds)."
+msgstr ""
+
+#: admin/SettingsPage.php:276
+msgid "Exchange in the archive"
+msgstr ""
+
+#: admin/SettingsPage.php:281
+msgid "If enabled, the exchange takes place through a zip archive."
+msgstr ""
+
+#: admin/SettingsPage.php:295
+msgid "Use full name"
+msgstr ""
+
+#: admin/SettingsPage.php:298
+msgid ""
+"If enabled, the title of the product will be recorded not \"Name\" and "
+"\"Full Name\" of the details of the products."
+msgstr ""
+
+#: admin/SettingsPage.php:304
+msgid "Products with a stock <= 0:"
+msgstr ""
+
+#: admin/SettingsPage.php:308
+msgid "Hide (not available for viewing and ordering)"
+msgstr ""
+
+#: admin/SettingsPage.php:311
+msgid "Do not hide and give the opportunity to put in the basket"
+msgstr ""
+
+#: admin/SettingsPage.php:317
+msgid "Only products with a non-empty price can be opened."
+msgstr ""
+
+#: admin/SettingsPage.php:331
+msgid "Remove missing products (full unload)"
+msgstr ""
+
+#: admin/SettingsPage.php:336
+msgid ""
+"If enabled, all products that are missing in the unloading will be deleted."
+msgstr ""
+
+#: admin/SettingsPage.php:344
+msgid "Categories for exclusion:"
+msgstr ""
+
+#: admin/SettingsPage.php:349
+msgid "Category IDs with a semicolon."
+msgstr ""
+
+#: admin/SettingsPage.php:359
+msgid ""
+"Set category thumbnails automatically (based on a product with a miniature "
+"in the category)"
+msgstr ""
+
+#: admin/SettingsPage.php:367
+msgid "Exchange orders with 1C"
+msgstr ""
+
+#: admin/SettingsPage.php:377
+msgid "Upload orders"
+msgstr ""
+
+#: admin/SettingsPage.php:380
+msgid ""
+"If enabled, when exchanging with 1C, the site gives all changed and new "
+"orders since the last synchronization."
+msgstr ""
+
+#: admin/SettingsPage.php:388
+msgid "For debugging"
+msgstr ""
+
+#: admin/SettingsPage.php:398
+msgid "Show code 1C"
+msgstr ""
+
+#: admin/SettingsPage.php:401
+msgid ""
+"If enabled, the metabox with the code will appear in the admin panel, as "
+"well as when viewing the list - the code will be displayed under the product "
+"name."
+msgstr ""
+
+#: admin/SettingsPage.php:409
+msgid "Exchange logging"
+msgstr ""
+
+#: admin/SettingsPage.php:414
+msgid ""
+"Logs of exchange with 1C are recorded in this directory. If it is not "
+"available for writing and reading, then logging will not work."
+msgstr ""
+
+#: admin/SettingsPage.php:430
+msgid "Store for:"
+msgstr ""
+
+#: admin/SettingsPage.php:434
+msgid "days"
+msgstr ""
+
+#: admin/SettingsPage.php:436
+msgid "Logs older will be deleted when exchanging."
+msgstr ""
+
+#: admin/SettingsPage.php:447
+msgid "Enable logging"
+msgstr ""
+
+#: admin/SettingsPage.php:450
+msgid ""
+"If enabled, when exchanging from 1C, logs of the exchange protocol are "
+"recorded."
+msgstr ""
+
+#: admin/SettingsPage.php:460
+msgid "Enable change logging"
+msgstr ""
+
+#: admin/SettingsPage.php:463
+msgid ""
+"If enabled, then when exchanging from 1C, logs of changes of objects are "
+"recorded."
+msgstr ""
+
+#: admin/SettingsPage.php:474
+msgid "Save settings"
+msgstr ""
+
+#: admin/SettingsPage.php:487
+msgid "Temporary directory for exchange with 1C"
+msgstr ""
+
+#: admin/SettingsPage.php:501
+msgid ""
+"Files received from 1C during the exchange are loaded into this directory if "
+"it is not available for write and read, sharing will be impossible."
+msgstr ""
+
+#: admin/SettingsPage.php:514
+msgid "Settings for authorization 1C"
+msgstr ""
+
+#: admin/SettingsPage.php:518
+msgid "Use these details when setting up an exchange node in 1C."
+msgstr ""
+
+#: admin/SettingsPage.php:524
+msgid "Sync Script Address:"
+msgstr ""
+
+#: admin/SettingsPage.php:537
+msgid "User:"
+msgstr ""
+
+#: admin/SettingsPage.php:550
+msgid "Password:"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:49
+#: exchange-process/CatalogProcessStarter.php:52
+#: exchange-process/SaleProcessStarter.php:44
+#: exchange-process/SaleProcessStarter.php:47
+msgid "Initialization Error!"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:99
+#: exchange-process/CatalogProcessStarter.php:105
+#: exchange-process/SaleProcessStarter.php:327
+#: exchange-process/SaleProcessStarter.php:333
+msgid "The directory / file is not writable"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:122
+#: exchange-process/CatalogProcessStarter.php:125
+#: exchange-process/SaleProcessStarter.php:346
+#: exchange-process/SaleProcessStarter.php:349
+msgid "Error writing file!"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:130
+#: exchange-process/CatalogProcessStarter.php:134
+#: exchange-process/SaleProcessStarter.php:354
+#: exchange-process/SaleProcessStarter.php:358
+msgid "Error reading http stream!"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:155
+#: exchange-process/CatalogProcessStarter.php:157
+msgid "Archive unpacked"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:182
+#: exchange-process/CatalogProcessStarter.php:185
+msgid "Processing groups"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:202
+#: exchange-process/CatalogProcessStarter.php:205
+msgid "Reading file"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:233
+#: exchange-process/CatalogProcessStarter.php:242
+msgid "Import file"
+msgstr ""
+
+#: exchange-process/CatalogProcessStarter.php:237
+#: exchange-process/CatalogProcessStarter.php:246
+msgid "completed!"
+msgstr ""
+
+#: exchange-process/RootProcessStarter.php:33
+#: exchange-process/RootProcessStarter.php:38
+msgid "Error! Synchronization is prohibited!"
+msgstr ""
+
+#: exchange-process/RootProcessStarter.php:51
+#: exchange-process/RootProcessStarter.php:56
+msgid "Error! Wrong login or password!"
+msgstr ""
+
+#: includes/Bootstrap.php:44
+msgid ""
+"To run the plug-in, you must first install and activate the WooCommerce "
+"plugin."
+msgstr ""
+
+#: includes/Bootstrap.php:48
+msgid "Error while activating the WooCommerce - 1C:Enterprise - Data Exchange"
+msgstr ""
+
+#: includes/Helper.php:240
+msgid "Exists, but is not available for writing. Change permissions."
+msgstr ""
+
+#: includes/Helper.php:247
+msgid "Created and available for writing."
+msgstr ""
+
+#: includes/Helper.php:252
+msgid "Not exist and unavailable for writing.."
+msgstr ""
+
+#: includes/Helper.php:258
+msgid "Exists and available for writing."
+msgstr ""

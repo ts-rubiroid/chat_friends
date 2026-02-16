@@ -1,0 +1,60 @@
+[2023-10-26T08:17:02.652642+00:00 | 653a207e9f44b.653a207e9f44d] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"33.96","Peak, mb":"33.98","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:02.652793+00:00 | 653a207e9f44b.653a207e9f44d] wc1c.INFO: [cookie list] []
+[2023-10-26T08:17:02.653173+00:00 | 653a207e9f44b.653a207e9f44d] wc1c.INFO: success - PHPSESSID 6t0teikj4g3pv600olue77ebsf  []
+[2023-10-26T08:17:02.654462+00:00 | 653a207e9f44b.653a207e9f44d] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"33.98","Peak, mb":"34.05","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:03.041237+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"33.96","Peak, mb":"33.98","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:03.041342+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: [cookie list] {"PHPSESSID":"6t0teikj4g3pv600olue77ebsf"}
+[2023-10-26T08:17:03.041591+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: response scheme version - 2.05 []
+[2023-10-26T08:17:03.041693+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: start orders modified date ["2023-10-26 11:16:00"]
+[2023-10-26T08:17:03.041779+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: setting - send_orders_date_create_start ["2023-08-25 00:01:00"]
+[2023-10-26T08:17:03.041822+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: setting - send_orders_date_create_end ["2023-10-31 21:23:00"]
+[2023-10-26T08:17:03.044285+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: count orders [0]
+[2023-10-26T08:17:03.044319+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: list order ids []
+[2023-10-26T08:17:03.044531+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: used encoding ["cp1251"]
+[2023-10-26T08:17:03.044604+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: order query send result []
+[2023-10-26T08:17:03.045968+00:00 | 653a207e9f44b.653a207f0a00f] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"34.02","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:03.445228+00:00 | 653a207e9f44b.653a207f6c99f] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"33.96","Peak, mb":"33.98","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:03.445325+00:00 | 653a207e9f44b.653a207f6c99f] wc1c.INFO: [cookie list] {"PHPSESSID":"6t0teikj4g3pv600olue77ebsf"}
+[2023-10-26T08:17:03.446983+00:00 | 653a207e9f44b.653a207f6c99f] wc1c.INFO: 1c send success, setting `send_orders_last_success_export` set ["2023-10-26 11:17"]
+[2023-10-26T08:17:03.447077+00:00 | 653a207e9f44b.653a207f6c99f] wc1c.INFO: success []
+[2023-10-26T08:17:03.448400+00:00 | 653a207e9f44b.653a207f6c99f] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"33.98","Peak, mb":"34.07","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:23.213088+00:00 | 653a209333efa.653a209333efc] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:23.213191+00:00 | 653a209333efa.653a209333efc] wc1c.INFO: [cookie list] []
+[2023-10-26T08:17:23.213388+00:00 | 653a209333efa.653a209333efc] wc1c.INFO: success - PHPSESSID husoqhbirurvgvo4ldb18qfr6g  []
+[2023-10-26T08:17:23.214762+00:00 | 653a209333efa.653a209333efc] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"34.1","Peak, mb":"34.12","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:23.599228+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:23.599364+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: [cookie list] {"PHPSESSID":"husoqhbirurvgvo4ldb18qfr6g"}
+[2023-10-26T08:17:23.599609+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: response scheme version - 2.05 []
+[2023-10-26T08:17:23.599703+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: start orders modified date ["2023-10-26 11:17:00"]
+[2023-10-26T08:17:23.599820+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: setting - send_orders_date_create_start ["2023-08-25 00:01:00"]
+[2023-10-26T08:17:23.599930+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: setting - send_orders_date_create_end ["2023-10-31 21:23:00"]
+[2023-10-26T08:17:23.602527+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: count orders [0]
+[2023-10-26T08:17:23.602573+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: list order ids []
+[2023-10-26T08:17:23.602650+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: used encoding ["cp1251"]
+[2023-10-26T08:17:23.602705+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: order query send result []
+[2023-10-26T08:17:23.604203+00:00 | 653a209333efa.653a2093923a4] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"34.15","Peak, mb":"34.21","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:24.003162+00:00 | 653a209333efa.653a209400b0e] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:24.003301+00:00 | 653a209333efa.653a209400b0e] wc1c.INFO: [cookie list] {"PHPSESSID":"husoqhbirurvgvo4ldb18qfr6g"}
+[2023-10-26T08:17:24.003582+00:00 | 653a209333efa.653a209400b0e] wc1c.INFO: 1c send success, setting `send_orders_last_success_export` set ["2023-10-26 11:17"]
+[2023-10-26T08:17:24.003645+00:00 | 653a209333efa.653a209400b0e] wc1c.INFO: success []
+[2023-10-26T08:17:24.005256+00:00 | 653a209333efa.653a209400b0e] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"34.1","Peak, mb":"34.12","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:42.915804+00:00 | 653a20a6df7ef.653a20a6df7f1] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:42.915969+00:00 | 653a20a6df7ef.653a20a6df7f1] wc1c.INFO: [cookie list] []
+[2023-10-26T08:17:42.916257+00:00 | 653a20a6df7ef.653a20a6df7f1] wc1c.INFO: success - PHPSESSID grf1efmo0f8sbik239cevdb1q5  []
+[2023-10-26T08:17:42.917656+00:00 | 653a20a6df7ef.653a20a6df7f1] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=checkauth","Usage, mb":"34.1","Peak, mb":"34.12","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:43.329340+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:43.329465+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: [cookie list] {"PHPSESSID":"grf1efmo0f8sbik239cevdb1q5"}
+[2023-10-26T08:17:43.329689+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: response scheme version - 2.05 []
+[2023-10-26T08:17:43.329770+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: start orders modified date ["2023-10-26 11:17:00"]
+[2023-10-26T08:17:43.329852+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: setting - send_orders_date_create_start ["2023-08-25 00:01:00"]
+[2023-10-26T08:17:43.329893+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: setting - send_orders_date_create_end ["2023-10-31 21:23:00"]
+[2023-10-26T08:17:43.332220+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: count orders [0]
+[2023-10-26T08:17:43.332263+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: list order ids []
+[2023-10-26T08:17:43.332336+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: used encoding ["cp1251"]
+[2023-10-26T08:17:43.332404+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: order query send result []
+[2023-10-26T08:17:43.333744+00:00 | 653a20a6df7ef.653a20a75058f] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=query","Usage, mb":"34.15","Peak, mb":"34.21","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:43.738373+00:00 | 653a20a6df7ef.653a20a7b42c6] wc1c.INFO: [START REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"34.09","Peak, mb":"34.11","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}
+[2023-10-26T08:17:43.738481+00:00 | 653a20a6df7ef.653a20a7b42c6] wc1c.INFO: [cookie list] {"PHPSESSID":"grf1efmo0f8sbik239cevdb1q5"}
+[2023-10-26T08:17:43.738691+00:00 | 653a20a6df7ef.653a20a7b42c6] wc1c.INFO: 1c send success, setting `send_orders_last_success_export` set ["2023-10-26 11:17"]
+[2023-10-26T08:17:43.738743+00:00 | 653a20a6df7ef.653a20a7b42c6] wc1c.INFO: success []
+[2023-10-26T08:17:43.740196+00:00 | 653a20a6df7ef.653a20a7b42c6] wc1c.INFO: [END REQUEST] {"Query":"type=sale&mode=success","Usage, mb":"34.11","Peak, mb":"34.12","Ip":"95.79.98.163","Method":"GET","User":"u0867343_cvetu","Site":"https://shop.radugann.com"}

@@ -43,6 +43,9 @@ dependencies:
   # Набор иконок для iOS-стиля (можем использовать в UI)
   cupertino_icons: ^1.0.8
 
+  # Хранение настроек (URL 1С, логин, пароль)
+  shared_preferences: ^2.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

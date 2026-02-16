@@ -7,8 +7,7 @@ import '../../models/spare_part.dart';
 
 /// Экран карточки конкретной запчасти.
 ///
-/// При открытии подгружает картинку из Catalog_НоменклатураПрисоединенныеФайлы
-/// и отображает основные реквизиты номенклатуры.
+/// Отображает основные реквизиты номенклатуры и картинку из 1С (Catalog_НоменклатураПрисоединенныеФайлы).
 class SparePartDetailsScreen extends StatelessWidget {
   final SparePart part;
   final OnecOdataClient client;
@@ -43,12 +42,13 @@ class SparePartDetailsScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Обновить',
             onPressed: () {
-              // Перезагружаем экран для обновления картинки
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (_) => SparePartDetailsScreen(
                     part: part,
                     client: client,
+                    price: price,
+                    stock: stock,
                   ),
                 ),
               );
@@ -65,7 +65,7 @@ class SparePartDetailsScreen extends StatelessWidget {
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: _PartImage(client: client, part: part),
+                child: _PartImage(part: part, client: client),
               ),
             ),
             const SizedBox(height: 16),
@@ -137,43 +137,42 @@ class SparePartDetailsScreen extends StatelessWidget {
   }
 }
 
+/// Загружает и показывает картинку номенклатуры из Catalog_НоменклатураПрисоединенныеФайлы.
 class _PartImage extends StatelessWidget {
-  final OnecOdataClient client;
   final SparePart part;
+  final OnecOdataClient client;
 
-  const _PartImage({required this.client, required this.part});
+  const _PartImage({required this.part, required this.client});
 
   @override
   Widget build(BuildContext context) {
-    // Если даже нет признаков прикреплённого файла, сразу показываем иконку.
-    if (part.pictureFileKey == null) {
-      return const _PlaceholderIcon();
-    }
-
     return FutureBuilder<Uint8List?>(
       future: client.loadNomenklaturaAttachmentImage(part.refKey),
+      key: ValueKey<String>(part.refKey),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
+          return SizedBox(
             height: 200,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
           );
         }
-
-        if (snapshot.hasError || snapshot.data == null) {
-          return const _PlaceholderIcon();
+        final bytes = snapshot.data;
+        if (bytes != null && bytes.isNotEmpty) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              height: 200,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const _PlaceholderIcon(),
+            ),
+          );
         }
-
-        final bytes = snapshot.data!;
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.memory(
-            bytes,
-            height: 240,
-            fit: BoxFit.contain,
-          ),
-        );
+        return const _PlaceholderIcon();
       },
     );
   }

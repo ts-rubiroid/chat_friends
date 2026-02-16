@@ -10,6 +10,7 @@ import 'package:chat_friends/models/user.dart';
 import 'package:chat_friends/screens/image_viewer_screen.dart';
 import 'package:chat_friends/screens/video_viewer_screen.dart';
 import 'package:chat_friends/services/download_service.dart';
+import 'package:chat_friends/services/notification_service.dart';
 import 'package:chat_friends/widgets/audio_player_bubble.dart';
 
 
@@ -32,13 +33,14 @@ class _ChatScreenState extends State<ChatScreen> {
   _PendingAttachment? _pendingAttachment;
   bool _isSending = false;
   User? _currentUser;
+  int _lastKnownMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
+    NotificationService.currentChatId = widget.chat.id;
     _loadInitialData();
     _startPolling();
-    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
@@ -49,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    NotificationService.currentChatId = null;
     _markChatAsRead();
     _messageController.dispose();
     _focusNode.dispose();
@@ -77,6 +80,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _currentUser = currentUser;
         _messages = messages;
         _isLoading = false;
+        _lastKnownMessageCount = messages.length;
       });
     } catch (e) {
       print('Ошибка загрузки данных: $e');
@@ -116,20 +120,27 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages() async {
     try {
       final messages = await ApiService.getMessages(widget.chat.id);
-      
-      print('[ChatScreen] Загружено ${messages.length} сообщений');
-      for (var msg in messages) {
-        if (msg.hasImage) {
-          print('[ChatScreen] ✅ Сообщение ${msg.id}: ЕСТЬ изображение: ${msg.imageUrl}');
+
+      if (mounted && messages.length > _lastKnownMessageCount && _currentUser != null) {
+        Message? lastNewFromOther;
+        for (var i = _lastKnownMessageCount; i < messages.length; i++) {
+          if (messages[i].senderId != _currentUser!.id) {
+            lastNewFromOther = messages[i];
+          }
         }
-        if (msg.hasFile) {
-          print('[ChatScreen] ✅ Сообщение ${msg.id}: ЕСТЬ файл: ${msg.fileUrl}');
+        if (lastNewFromOther != null) {
+          print('[Notify] ChatScreen: новое сообщение от другого в чате ${widget.chat.id}, показываем уведомление');
+          await NotificationService.showNewMessageNotification(
+            chat: widget.chat,
+            message: lastNewFromOther,
+          );
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _messages = messages;
+          _lastKnownMessageCount = messages.length;
         });
         _markChatAsRead();
       }
