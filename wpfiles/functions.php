@@ -128,7 +128,19 @@ add_action('rest_api_init', function() {
     ]);
     
     // Также регистрируем отдельные поля для удобства
-    $user_fields = ['phone', 'password', 'avatar', 'first_name', 'last_name', 'nickname', 'created_at', 'user_id'];
+    // Добавляем сюда и новое поле "position" (должность)
+    $user_fields = [
+        'phone',
+        'password',
+        'avatar',
+        'first_name',
+        'last_name',
+        'middle_name',
+        'nickname',
+        'position',
+        'created_at',
+        'user_id',
+    ];
     foreach ($user_fields as $field) {
         register_rest_field('chat_user', $field, [
             'get_callback' => $add_acf_to_rest,

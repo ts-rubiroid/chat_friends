@@ -22,7 +22,13 @@ class ApiService {
       try {
         return json.decode(response.body);
       } catch (e) {
-        // Не бросаем исключение, возвращаем пустой Map
+        // Иногда сервер может "приклеить" Warning/Notice перед JSON (WP_DEBUG_DISPLAY),
+        // из-за чего json.decode падает. Попробуем восстановить JSON из тела.
+        final recovered = _tryRecoverJson(response.body);
+        if (recovered != null) {
+          return recovered;
+        }
+
         print('[WARNING] Ошибка парсинга JSON: $e');
         return {'success': false, 'error': 'Invalid JSON response'};
       }
@@ -46,6 +52,51 @@ class ApiService {
         };
       }
     }
+  }
+
+  /// Пытаемся вытащить первый валидный JSON-объект/массив из строки,
+  /// если перед ним есть текст (например, PHP Warning).
+  static Map<String, dynamic>? _tryRecoverJson(String body) {
+    final trimmed = body.trimLeft();
+    if (trimmed.isEmpty) return null;
+
+    // Быстрый путь: уже начинается с JSON
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        final decoded = json.decode(trimmed);
+        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is List) {
+          // Иногда API возвращает список; оборачиваем в единый формат
+          return {'success': true, 'data': decoded};
+        }
+      } catch (_) {
+        // continue
+      }
+    }
+
+    // Ищем первое '{' или '[' и пытаемся декодировать с него
+    final objIdx = body.indexOf('{');
+    final arrIdx = body.indexOf('[');
+    int start = -1;
+    if (objIdx == -1) {
+      start = arrIdx;
+    } else if (arrIdx == -1) {
+      start = objIdx;
+    } else {
+      start = objIdx < arrIdx ? objIdx : arrIdx;
+    }
+
+    if (start == -1) return null;
+    final candidate = body.substring(start).trimLeft();
+    try {
+      final decoded = json.decode(candidate);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is List) return {'success': true, 'data': decoded};
+    } catch (_) {
+      return null;
+    }
+
+    return null;
   }
 
 
@@ -272,6 +323,38 @@ class ApiService {
     // Ошибка
     final err = result['error'] ?? result['message'] ?? 'Не удалось обновить профиль';
     throw Exception(err.toString());
+  }
+
+  /// Удаление (soft-delete) профиля текущего пользователя.
+  /// После успешного удаления токен остаётся технически валидным, поэтому
+  /// вызывающему коду рекомендуется вызывать [logout] и переводить пользователя
+  /// на экран входа.
+  static Future<bool> deleteProfile({int? userIdForAdmin}) async {
+    final headers = await _getHeaders();
+    final url = Uri.parse(ApiConfig.deleteProfileEndpoint);
+
+    final body = <String, dynamic>{};
+    if (userIdForAdmin != null) {
+      body['user_id'] = userIdForAdmin;
+    }
+
+    ApiConfig.logRequest('POST', url.toString(), body: body.isEmpty ? null : body);
+
+    final response = await http.post(
+      url,
+      headers: headers,
+      body: json.encode(body),
+    );
+
+    final result = await _handleResponse(response);
+
+    if (result['success'] == true) {
+      return true;
+    }
+
+    final err = result['error'] ?? result['message'] ?? 'Не удалось удалить профиль';
+    print('[ERROR] Ошибка удаления профиля: $err');
+    return false;
   }
 
   // === ЧАТЫ ===
@@ -1000,7 +1083,49 @@ class ApiService {
 
 
   static Future<bool> deleteMessage(int messageId) async {
-    print('[WARNING] deleteMessage не реализован на бэкенде');
-    return false;
+    final headers = await _getHeaders();
+    final url = Uri.parse(ApiConfig.deleteMessageEndpoint(messageId));
+
+    ApiConfig.logRequest('POST', url.toString());
+
+    try {
+      final response = await http.post(url, headers: headers);
+      final result = await _handleResponse(response);
+
+      if (result['success'] == true) {
+        return true;
+      }
+
+      // Fallback: если на сервере нет POST /messages/{id}/delete,
+      // пробуем стандартный REST-метод DELETE /messages/{id}
+      final errText = (result['error'] ?? result['message'] ?? '').toString();
+      final statusCode = result['statusCode'];
+
+      final looksLikeNoRoute = (statusCode == 404) ||
+          errText.contains('No route was found') ||
+          errText.contains('rest_no_route');
+
+      if (looksLikeNoRoute) {
+        final deleteUrl = Uri.parse(ApiConfig.deleteMessageEndpointRest(messageId));
+        ApiConfig.logRequest('DELETE', deleteUrl.toString());
+
+        final deleteResponse = await http.delete(deleteUrl, headers: headers);
+        final deleteResult = await _handleResponse(deleteResponse);
+
+        if (deleteResult['success'] == true) {
+          return true;
+        }
+
+        print('[ERROR] Ошибка удаления сообщения $messageId (DELETE fallback): '
+            '${deleteResult['error'] ?? deleteResult['message'] ?? deleteResult}');
+        return false;
+      }
+
+      print('[ERROR] Ошибка удаления сообщения $messageId: ${result['error'] ?? result['message'] ?? result}');
+      return false;
+    } catch (e) {
+      print('[ERROR] Ошибка удаления сообщения $messageId: $e');
+      return false;
+    }
   }
 }

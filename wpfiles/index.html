@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API - Тестирование</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        .logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+        
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .info-box h3 i {
+            color: #667eea;
+        }
+        
+        .info-item {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-item:last-child {
+            border-bottom: none;
+        }
+        
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+        
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 40px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            box-shadow: 0 5px 20px rgba(108, 117, 125, 0.4);
+            margin-top: 15px;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 8px 25px rgba(108, 117, 125, 0.5);
+        }
+        
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #e8f5e9;
+            border: 2px solid #4CAF50;
+        }
+        
+        .status h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .endpoints {
+            background: #e3f2fd;
+            border: 2px solid #2196F3;
+            margin-top: 20px;
+        }
+        
+        .endpoints h4 {
+            color: #1565c0;
+        }
+        
+        .auto-redirect {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .countdown {
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+    <script>
+        let countdown = 10;
+        
+        function startCountdown() {
+            const countdownElement = document.getElementById('countdown');
+            const interval = setInterval(() => {
+                countdown--;
+                countdownElement.textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    window.location.href = 'chat-test.html';
+                }
+            }, 1000);
+        }
+        
+        function redirectNow() {
+            window.location.href = 'chat-test.html';
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            startCountdown();
+            
+            // Проверка API при загрузке
+            fetch('https://chat.remont-gazon.ru/wp-json/chat-api/v1/test')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('apiStatus');
+                    if (data.success) {
+                        statusElement.innerHTML = `
+                            <h4><span style="font-size: 24px;">✅</span> API работает стабильно</h4>
+                            <p><strong>Версия:</strong> ${data.message || 'Chat API v3.0'}</p>
+                            <p><strong>Время сервера:</strong> ${data.timestamp || 'Н/Д'}</p>
+                            <p><strong>Доступно endpoints:</strong> ${data.endpoints ? Object.keys(data.endpoints).length : 'Все'}</p>
+                        `;
+                    } else {
+                        statusElement.innerHTML = `
+                            <h4><span style="font-size: 24px;">⚠️</span> API требует проверки</h4>
+                            <p>Получен неожиданный ответ от сервера.</p>
+                        `;
+                        statusElement.style.background = '#fff3cd';
+                        statusElement.style.borderColor = '#ffc107';
+                    }
+                })
+                .catch(error => {
+                    const statusElement = document.getElementById('apiStatus');
+                    statusElement.innerHTML = `
+                        <h4><span style="font-size: 24px;">❌</span> API недоступен</h4>
+                        <p><strong>Ошибка:</strong> ${error.message}</p>
+                        <p>Проверьте подключение к серверу.</p>
+                    `;
+                    statusElement.style.background = '#f8d7da';
+                    statusElement.style.borderColor = '#f5c6cb';
+                });
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱</div>
+        <h1>Chat Friends API</h1>
+        <div class="subtitle">
+            Полный набор инструментов для тестирования<br>
+            корпоративной системы чатов
+        </div>
+        
+        <div class="badge">ВЕРСИЯ 3.0 • ПРОДАКШЕН ГОТОВ</div>
+        
+        <div class="info-box">
+            <h3><span>📊</span> Системная информация</h3>
+            <div class="info-item">
+                <span class="info-label">Домен:</span>
+                <span class="info-value">chat.remont-gazon.ru</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Base URL:</span>
+                <span class="info-value">/wp-json</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Тестовый телефон:</span>
+                <span class="info-value">+79161234567</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Тестовый пароль:</span>
+                <span class="info-value">123456</span>
+            </div>
+        </div>
+        
+        <div id="apiStatus" class="status">
+            <h4><span style="font-size: 24px;">⏳</span> Проверка API...</h4>
+            <p>Подключение к серверу...</p>
+        </div>
+        
+        <div class="endpoints status">
+            <h4><span style="font-size: 24px;">🔌</span> Доступные разделы API</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <div style="text-align: left;">
+                    <strong>Аутентификация:</strong><br>
+                    • POST /auth/login<br>
+                    • POST /auth/register<br>
+                    • POST /auth/validate
+                </div>
+                <div style="text-align: left;">
+                    <strong>Чаты:</strong><br>
+                    • GET /chats<br>
+                    • POST /chats/create<br>
+                    • GET /chats/{id}
+                </div>
+                <div style="text-align: left;">
+                    <strong>Сообщения:</strong><br>
+                    • GET /messages<br>
+                    • POST /messages/send<br>
+                    • GET /messages/search
+                </div>
+                <div style="text-align: left;">
+                    <strong>Пользователи:</strong><br>
+                    • GET /users<br>
+                    • GET /me<br>
+                    • POST /upload
+                </div>
+            </div>
+        </div>
+        
+        <button onclick="redirectNow()" class="btn pulse">
+            🚀 Перейти к тестированию API
+        </button>
+        
+        <a href="api-documentation-v3.md" class="btn btn-secondary">
+            📚 Открыть документацию
+        </a>
+        
+        <div class="auto-redirect">
+            Автоматический переход через <span id="countdown" class="countdown">10</span> секунд...
+        </div>
+    </div>
+</body>
+</html>

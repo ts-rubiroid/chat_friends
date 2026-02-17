@@ -1,7 +1,15 @@
 <?php
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// ВАЖНО: не форсируем вывод PHP warnings/notices в продакшене,
+// иначе REST API начинает отдавать "мусор" перед JSON и Flutter не может распарсить ответ.
+// Используем стандартные настройки WordPress (WP_DEBUG / WP_DEBUG_DISPLAY).
+if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_reporting(E_ALL);
+    // В дебаге можно включать отображение ошибок, но лучше держать WP_DEBUG_DISPLAY=false
+    // и смотреть /wp-content/debug.log.
+} else {
+    @ini_set('display_errors', '0');
+}
 
 /**
  * Полная система аутентификации для чата

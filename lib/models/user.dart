@@ -9,6 +9,7 @@ class User {
   final String? firstName;
   final String? middleName;
   final String? nickname;
+  final String? position; // Должность
   final DateTime? createdAt;
 
   User({
@@ -19,6 +20,7 @@ class User {
     this.firstName,
     this.middleName,
     this.nickname,
+    this.position,
     this.createdAt,
   });
 
@@ -32,6 +34,7 @@ class User {
       firstName: json['first_name']?.toString(),
       middleName: json['middle_name']?.toString(),
       nickname: json['nickname']?.toString(),
+      position: json['position']?.toString(),
       createdAt: _parseDateTime(json['created_at']),
     );
   }
@@ -209,7 +212,9 @@ class User {
       'phone': phone,
       'firstName': firstName,
       'lastName': lastName,
+      'middleName': middleName,
       'nickname': nickname,
+      'position': position,
       'displayName': displayName,
       'hasAvatar': hasAvatar,
       'avatarUrl': avatarUrl,
@@ -226,6 +231,7 @@ class User {
       firstName: null,
       middleName: null,
       nickname: null,
+      position: null,
       createdAt: null,
     );
   }

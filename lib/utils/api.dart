@@ -26,6 +26,7 @@ class ApiConfig {
   static const String meEndpoint = '$chatApi/me';
   static const String usersEndpoint = '$chatApi/users';
   static const String updateProfileEndpoint = '$chatApi/users/update';
+  static const String deleteProfileEndpoint = '$chatApi/users/delete';
   
   // Чаты
   static const String chatsEndpoint = '$chatApi/chats';
@@ -48,6 +49,8 @@ class ApiConfig {
   // Удаление (если реализовано на бэкенде)
   static String deleteChatEndpoint(int chatId) => '$chatApi/chats/$chatId/delete';
   static String deleteMessageEndpoint(int messageId) => '$chatApi/messages/$messageId/delete';
+  // Альтернативный стандартный REST-вариант (если бэкенд принимает DELETE без /delete)
+  static String deleteMessageEndpointRest(int messageId) => '$chatApi/messages/$messageId';
   
   // === ДОПОЛНИТЕЛЬНЫЕ УТИЛИТЫ ===
   

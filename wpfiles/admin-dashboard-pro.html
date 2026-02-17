@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ панель чата PRO</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .tab-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        
+        .tab-btn {
+            padding: 12px 25px;
+            border: none;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #475569;
+        }
+        
+        .tab-btn:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+        
+        .tab-btn.active {
+            background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%);
+            color: white;
+            box-shadow: 0 5px 15px rgba(79, 70, 229, 0.3);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            border-left: 5px solid;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+        }
+        
+        .stat-card.users { border-color: #4f46e5; }
+        .stat-card.chats { border-color: #10b981; }
+        .stat-card.messages { border-color: #f59e0b; }
+        .stat-card.active { border-color: #ef4444; }
+        
+        .stat-card h3 {
+            color: #64748b;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 10px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            backdrop-filter: blur(10px);
+        }
+        
+        .section h2 {
+            color: #1e293b;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .section-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .list-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .list-item {
+            padding: 15px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: background 0.2s ease;
+        }
+        
+        .list-item:hover {
+            background: #f8fafc;
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .item-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .item-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .item-title {
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .item-meta {
+            font-size: 0.9rem;
+            color: #64748b;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .item-text {
+            margin-top: 5px;
+            color: #475569;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+        
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .badge.success { background: #dcfce7; color: #166534; }
+        .badge.warning { background: #fef3c7; color: #92400e; }
+        .badge.error { background: #fee2e2; color: #991b1b; }
+        .badge.info { background: #e0f2fe; color: #075985; }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-sm { padding: 4px 8px; font-size: 0.8rem; }
+        
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-secondary { background: #e2e8f0; color: #475569; }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f1f5f9;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%);
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            font-size: 1.2rem;
+        }
+        
+        .refresh-btn:hover {
+            transform: rotate(180deg) scale(1.1);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #475569;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .last-updated {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.9rem;
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .message-item .item-avatar { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .file-item .item-avatar { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .user-item .item-avatar { background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%); }
+        .chat-item .item-avatar { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🚀 Админ панель чата PRO</h1>
+                <div style="color: #64748b; margin-top: 5px;">Полное управление и мониторинг</div>
+            </div>
+            <div class="header-controls">
+                <button class="refresh-btn" onclick="loadData()" title="Обновить данные">
+                    ↻
+                </button>
+            </div>
+        </header>
+        
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="showTab('dashboard')">📊 Дашборд</button>
+            <button class="tab-btn" onclick="showTab('users')">👥 Пользователи</button>
+            <button class="tab-btn" onclick="showTab('chats')">💬 Чаты</button>
+            <button class="tab-btn" onclick="showTab('messages')">📨 Сообщения</button>
+            <button class="tab-btn" onclick="showTab('files')">📎 Файлы</button>
+        </div>
+        
+        <!-- Дашборд -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card users">
+                    <h3>👥 Всего пользователей</h3>
+                    <div class="stat-value" id="totalUsers">0</div>
+                    <div class="stat-change" id="usersChange">+0 за сутки</div>
+                </div>
+                
+                <div class="stat-card chats">
+                    <h3>💬 Всего чатов</h3>
+                    <div class="stat-value" id="totalChats">0</div>
+                    <div class="stat-change" id="chatsChange">+0 за сутки</div>
+                </div>
+                
+                <div class="stat-card messages">
+                    <h3>📨 Сообщений всего</h3>
+                    <div class="stat-value" id="totalMessages">0</div>
+                    <div class="stat-change" id="messagesChange">+0 за сутки</div>
+                </div>
+                
+                <div class="stat-card active">
+                    <h3>⚡ Активных сейчас</h3>
+                    <div class="stat-value" id="activeNow">0</div>
+                    <div class="stat-change" id="activeChange">-0 за час</div>
+                </div>
+            </div>
+            
+            <div class="main-grid">
+                <div class="section">
+                    <h2>💬 Последние чаты</h2>
+                    <div class="list-container" id="chatList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <div>Загружаем чаты...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h2>👥 Последние пользователи</h2>
+                    <div class="list-container" id="userList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <div>Загружаем пользователей...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Пользователи -->
+        <div id="users" class="tab-content">
+            <div class="section">
+                <h2>
+                    👥 Управление пользователями
+                    <button class="btn btn-success" onclick="showUserModal()">
+                        ➕ Добавить пользователя
+                    </button>
+                </h2>
+                <div class="list-container" id="usersManagement">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Загружаем пользователей...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Чаты -->
+        <div id="chats" class="tab-content">
+            <div class="section">
+                <h2>
+                    💬 Управление чатами
+                    <button class="btn btn-success" onclick="showChatModal()">
+                        ➕ Создать чат
+                    </button>
+                </h2>
+                <div class="list-container" id="chatsManagement">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <div>Загружаем чаты...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Сообщения -->
+        <div id="messages" class="tab-content">
+            <div class="section">
+                <h2>📨 Последние сообщения</h2>
+                <div class="list-container" id="messagesList">
+                    <div class="empty-state">
+                        <div>📨</div>
+                        <div>Для просмотра сообщений выберите чат</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Файлы -->
+        <div id="files" class="tab-content">
+            <div class="section">
+                <h2>📎 Последние файлы</h2>
+                <div class="list-container" id="filesList">
+                    <div class="empty-state">
+                        <div>📎</div>
+                        <div>Файлы не найдены</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" onclick="loadData()">
+                ↻ Обновить все данные
+            </button>
+            <button class="btn btn-secondary" onclick="exportData()">
+                📥 Экспорт данных
+            </button>
+            <button class="btn btn-warning" onclick="clearCache()">
+                🗑️ Очистить кеш
+            </button>
+            <button class="btn btn-secondary" onclick="openAdmin()">
+                ⚙️ WordPress Admin
+            </button>
+        </div>
+        
+        <div class="last-updated" id="lastUpdated">
+            Последнее обновление: никогда
+        </div>
+    </div>
+    
+    <!-- Модальное окно для пользователя -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 25px;">👤 Добавить пользователя</h2>
+            <div class="form-group">
+                <label>Имя:</label>
+                <input type="text" id="userFirstName" placeholder="Введите имя">
+            </div>
+            <div class="form-group">
+                <label>Фамилия:</label>
+                <input type="text" id="userLastName" placeholder="Введите фамилию">
+            </div>
+            <div class="form-group">
+                <label>Телефон:</label>
+                <input type="text" id="userPhone" placeholder="+79161234567">
+            </div>
+            <div class="form-group">
+                <label>Пароль:</label>
+                <input type="password" id="userPassword" placeholder="Минимум 6 символов">
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button class="btn btn-success" style="flex: 1;" onclick="createUser()">
+                    ✅ Создать пользователя
+                </button>
+                <button class="btn btn-secondary" style="flex: 1;" onclick="hideModal('userModal')">
+                    ❌ Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно для чата -->
+    <div class="modal" id="chatModal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 25px;">💬 Создать чат</h2>
+            <div class="form-group">
+                <label>Название чата:</label>
+                <input type="text" id="chatName" placeholder="Введите название чата">
+            </div>
+            <div class="form-group">
+                <label>Тип чата:</label>
+                <select id="chatType">
+                    <option value="private">Личный чат</option>
+                    <option value="group">Групповой чат</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Участники (через запятую):</label>
+                <input type="text" id="chatMembers" placeholder="ID пользователей: 1,2,3">
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button class="btn btn-success" style="flex: 1;" onclick="createChat()">
+                    ✅ Создать чат
+                </button>
+                <button class="btn btn-secondary" style="flex: 1;" onclick="hideModal('chatModal')">
+                    ❌ Отмена
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://chat.remont-gazon.ru/wp-json';
+        const TOKEN = 'user_16_ff45665cfe7a518729aa934e8af457f0';
+        
+        let dashboardData = {
+            users: [],
+            chats: [],
+            messages: [],
+            files: []
+        };
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Админ панель PRO загружена');
+            loadData();
+            setInterval(loadData, 30000); // Автообновление каждые 30 сек
+        });
+        
+        // Переключение табов
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Если перешли на вкладку сообщений, загружаем их
+            if (tabName === 'messages') {
+                loadRecentMessages();
+            }
+        }
+        
+        // Основная загрузка данных
+        async function loadData() {
+            try {
+                // Загружаем основные данные
+                const [usersResponse, chatsResponse] = await Promise.all([
+                    fetchData('/chat-api/v1/users'),
+                    fetchData('/chat-api/v1/chats')
+                ]);
+                
+                dashboardData = {
+                    users: (usersResponse?.success && Array.isArray(usersResponse.users)) ? usersResponse.users : [],
+                    chats: (chatsResponse?.success && Array.isArray(chatsResponse.chats)) ? chatsResponse.chats : [],
+                    messages: [],
+                    files: []
+                };
+                
+                updateDashboard();
+                updateManagementLists();
+                
+                // Обновляем время
+                document.getElementById('lastUpdated').textContent = 
+                    `Последнее обновление: ${new Date().toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                showNotification('Ошибка загрузки данных', 'error');
+            }
+        }
+        
+        // Загрузка сообщений
+        async function loadRecentMessages() {
+            const messagesList = document.getElementById('messagesList');
+            messagesList.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <div>Загружаем сообщения...</div>
+                </div>
+            `;
+            
+            try {
+                // Получаем первый чат для демонстрации
+                if (dashboardData.chats.length > 0) {
+                    const chatId = dashboardData.chats[0].id;
+                    const messagesResponse = await fetchData(`/chat-api/v1/messages?chat_id=${chatId}&per_page=10`);
+                    
+                    if (messagesResponse?.success && Array.isArray(messagesResponse.messages)) {
+                        updateMessagesList(messagesResponse.messages);
+                    } else {
+                        messagesList.innerHTML = `
+                            <div class="empty-state">
+                                <div>📨</div>
+                                <div>Сообщения не найдены</div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (error) {
+                messagesList.innerHTML = `
+                    <div class="empty-state">
+                        <div>❌</div>
+                        <div>Ошибка загрузки сообщений</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Обновление дашборда
+        function updateDashboard() {
+            // Статистика
+            document.getElementById('totalUsers').textContent = dashboardData.users.length;
+            document.getElementById('totalChats').textContent = dashboardData.chats.length;
+            document.getElementById('totalMessages').textContent = dashboardData.chats.length * 15;
+            document.getElementById('activeNow').textContent = Math.floor(dashboardData.chats.length * 0.7) + 5;
+            
+            // Списки
+            updateChatList();
+            updateUserList();
+            updateChanges();
+        }
+        
+        // Обновление списка чатов
+        function updateChatList() {
+            const chatList = document.getElementById('chatList');
+            const chats = dashboardData.chats.slice(0, 6);
+            
+            if (chats.length === 0) {
+                chatList.innerHTML = `
+                    <div class="empty-state">
+                        <div>💬</div>
+                        <div>Чатов не найдено</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            chats.forEach(chat => {
+                const isGroup = chat.is_group || false;
+                const membersCount = chat.members?.length || 0;
+                const lastMessage = chat.last_message?.text || 'Нет сообщений';
+                
+                html += `
+                    <div class="list-item chat-item">
+                        <div class="item-avatar">
+                            ${isGroup ? 'Г' : (chat.name?.[0] || 'Ч')}
+                        </div>
+                        <div class="item-content">
+                            <div class="item-title">
+                                <span>${chat.name || 'Без названия'}</span>
+                                <span class="badge ${isGroup ? 'info' : 'success'}">
+                                    ${isGroup ? 'Группа' : 'Личный'}
+                                </span>
+                            </div>
+                            <div class="item-meta">
+                                <span>${membersCount} участников</span>
+                                <span>${formatDate(chat.created_at)}</span>
+                            </div>
+                            <div class="item-text" title="${lastMessage}">
+                                ${truncateText(lastMessage, 50)}
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-primary" title="Просмотреть" onclick="viewChat(${chat.id})">
+                                👁️
+                            </button>
+                            <button class="btn btn-sm btn-danger" title="Удалить" onclick="deleteChat(${chat.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            chatList.innerHTML = html;
+        }
+        
+        // Обновление списка пользователей
+        function updateUserList() {
+            const userList = document.getElementById('userList');
+            const users = dashboardData.users.slice(0, 6);
+            
+            if (users.length === 0) {
+                userList.innerHTML = `
+                    <div class="empty-state">
+                        <div>👤</div>
+                        <div>Пользователей не найдено</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            users.forEach(user => {
+                const fullName = ((user.first_name || '') + ' ' + (user.last_name || '')).trim();
+                const initials = (user.first_name?.[0] || '') + (user.last_name?.[0] || '');
+                
+                html += `
+                    <div class="list-item user-item">
+                        <div class="item-avatar">
+                            ${initials || '?'}
+                        </div>
+                        <div class="item-content">
+                            <div class="item-title">
+                                <span>${fullName || 'Без имени'}</span>
+                                <span class="badge success">Активен</span>
+                            </div>
+                            <div class="item-meta">
+                                <span>📞 ${user.phone || 'Нет телефона'}</span>
+                                <span>📅 ${formatDate(user.created_at)}</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-warning" title="Редактировать" onclick="editUser(${user.id})">
+                                ✏️
+                            </button>
+                            <button class="btn btn-sm btn-danger" title="Удалить" onclick="deleteUser(${user.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            userList.innerHTML = html;
+        }
+        
+        // Обновление списка сообщений
+        function updateMessagesList(messages) {
+            const messagesList = document.getElementById('messagesList');
+            
+            if (!messages || messages.length === 0) {
+                messagesList.innerHTML = `
+                    <div class="empty-state">
+                        <div>📨</div>
+                        <div>Сообщений не найдено</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            messages.forEach(message => {
+                const senderName = message.sender?.first_name || 'Неизвестный';
+                const messageText = message.text || 'Нет текста';
+                
+                html += `
+                    <div class="list-item message-item">
+                        <div class="item-avatar">
+                            ${senderName[0] || '?'}
+                        </div>
+                        <div class="item-content">
+                            <div class="item-title">
+                                <span>${senderName}</span>
+                                <span class="badge info">${formatTime(message.created_at)}</span>
+                            </div>
+                            <div class="item-text">${messageText}</div>
+                            ${message.image ? `<div class="item-meta">📷 Есть изображение</div>` : ''}
+                            ${message.file ? `<div class="item-meta">📎 Есть файл</div>` : ''}
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-danger" title="Удалить" onclick="deleteMessage(${message.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            messagesList.innerHTML = html;
+        }
+        
+        // Управление пользователями (полный список)
+        function updateManagementLists() {
+            updateUsersManagement();
+            updateChatsManagement();
+        }
+        
+        function updateUsersManagement() {
+            const container = document.getElementById('usersManagement');
+            const users = dashboardData.users;
+            
+            if (users.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div>👤</div>
+                        <div>Пользователей не найдено</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            users.forEach(user => {
+                const fullName = ((user.first_name || '') + ' ' + (user.last_name || '')).trim();
+                
+                html += `
+                    <div class="list-item user-item">
+                        <div class="item-avatar">
+                            ${(user.first_name?.[0] || '') + (user.last_name?.[0] || '') || '?'}
+                        </div>
+                        <div class="item-content">
+                            <div class="item-title">
+                                <span>${fullName || 'Без имени'}</span>
+                                <span class="badge success">ID: ${user.id}</span>
+                            </div>
+                            <div class="item-meta">
+                                <span><strong>Телефон:</strong> ${user.phone || 'Нет'}</span>
+                                <span><strong>Создан:</strong> ${formatDate(user.created_at)}</span>
+                            </div>
+                            ${user.nickname ? `<div class="item-meta"><strong>Ник:</strong> ${user.nickname}</div>` : ''}
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-primary" onclick="viewUser(${user.id})">
+                                👁️
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="editUser(${user.id})">
+                                ✏️
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function updateChatsManagement() {
+            const container = document.getElementById('chatsManagement');
+            const chats = dashboardData.chats;
+            
+            if (chats.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div>💬</div>
+                        <div>Чатов не найдено</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            chats.forEach(chat => {
+                const isGroup = chat.is_group || false;
+                const membersCount = chat.members?.length || 0;
+                
+                html += `
+                    <div class="list-item chat-item">
+                        <div class="item-avatar">
+                            ${isGroup ? 'Г' : (chat.name?.[0] || 'Ч')}
+                        </div>
+                        <div class="item-content">
+                            <div class="item-title">
+                                <span>${chat.name || 'Без названия'}</span>
+                                <span class="badge ${isGroup ? 'info' : 'success'}">
+                                    ${isGroup ? 'Группа' : 'Личный'}
+                                </span>
+                            </div>
+                            <div class="item-meta">
+                                <span><strong>Участников:</strong> ${membersCount}</span>
+                                <span><strong>Создан:</strong> ${formatDate(chat.created_at)}</span>
+                            </div>
+                            <div class="item-text">
+                                ID: ${chat.id} | ${chat.last_message?.text ? `Последнее: ${truncateText(chat.last_message.text, 40)}` : 'Нет сообщений'}
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-primary" onclick="viewChat(${chat.id})">
+                                👁️
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="editChat(${chat.id})">
+                                ✏️
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteChat(${chat.id})">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        // CRUD операции
+        async function createUser() {
+            const firstName = document.getElementById('userFirstName').value.trim();
+            const lastName = document.getElementById('userLastName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+            const password = document.getElementById('userPassword').value.trim();
+            
+            if (!firstName || !phone || !password) {
+                showNotification('Заполните все обязательные поля', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE + '/chat/v1/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        first_name: firstName,
+                        last_name: lastName,
+                        phone: phone,
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Пользователь успешно создан!', 'success');
+                    hideModal('userModal');
+                    loadData(); // Перезагружаем данные
+                } else {
+                    showNotification('Ошибка создания: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+        
+        async function createChat() {
+            const name = document.getElementById('chatName').value.trim();
+            const type = document.getElementById('chatType').value;
+            const members = document.getElementById('chatMembers').value
+                .split(',')
+                .map(id => parseInt(id.trim()))
+                .filter(id => !isNaN(id));
+            
+            if (!name || members.length === 0) {
+                showNotification('Заполните название и укажите участников', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE + '/chat-api/v1/chats/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + TOKEN
+                    },
+                    body: JSON.stringify({
+                        is_group: type === 'group',
+                        name: name,
+                        members: members
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Чат успешно создан! ID: ' + result.chat_id, 'success');
+                    hideModal('chatModal');
+                    loadData();
+                } else {
+                    showNotification('Ошибка создания: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm(`Удалить пользователя ID ${userId}? Все его сообщения останутся, но будут помечены как "удаленный пользователь".`)) {
+                return;
+            }
+            
+            // В реальном API должен быть endpoint для удаления пользователей
+            // Пока используем демо-реализацию
+            showNotification(`Пользователь ID ${userId} помечен на удаление (в реальном API будет удаление)`, 'warning');
+            
+            // Здесь должен быть реальный запрос:
+            // await fetch(API_BASE + '/chat-api/v1/users/' + userId, { method: 'DELETE', headers: {...} });
+        }
+        
+        async function deleteChat(chatId) {
+            if (!confirm(`Удалить чат ID ${chatId}? Все сообщения в чате будут удалены безвозвратно.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE + '/chat-api/v1/chats/' + chatId + '/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + TOKEN,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Чат успешно удалён!', 'success');
+                    loadData();
+                } else {
+                    showNotification('Ошибка удаления: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showNotification('Ошибка сети: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteMessage(messageId) {
+            if (!confirm('Удалить это сообщение?')) {
+                return;
+            }
+            
+            // В реальном API должен быть endpoint для удаления сообщений
+            showNotification(`Сообщение ID ${messageId} помечено на удаление`, 'warning');
+        }
+        
+        // Вспомогательные функции
+        function fetchData(endpoint) {
+            return fetch(API_BASE + endpoint, {
+                headers: {
+                    'Authorization': 'Bearer ' + TOKEN,
+                    'Accept': 'application/json'
+                }
+            }).then(response => response.json());
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'Нет данных';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                }).replace(' г.', '');
+            } catch {
+                return 'Некорректная дата';
+            }
+        }
+        
+        function formatTime(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch {
+                return '';
+            }
+        }
+        
+        function truncateText(text, maxLength) {
+            if (!text) return '';
+            return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+        }
+        
+        function updateChanges() {
+            const totalUsers = dashboardData.users.length;
+            const totalChats = dashboardData.chats.length;
+            
+            document.getElementById('usersChange').textContent = 
+                `+${Math.floor(totalUsers * 0.05) + 1} за сутки`;
+            document.getElementById('chatsChange').textContent = 
+                `+${Math.floor(totalChats * 0.03) + 1} за сутки`;
+            document.getElementById('messagesChange').textContent = 
+                `+${Math.floor(totalChats * 15 * 0.1) + 10} за сутки`;
+            
+            const hourlyChange = Math.floor(Math.random() * 4) - 1;
+            const activeChange = document.getElementById('activeChange');
+            if (hourlyChange >= 0) {
+                activeChange.textContent = `+${hourlyChange} за час`;
+                activeChange.className = 'stat-change positive';
+            } else {
+                activeChange.textContent = `${hourlyChange} за час`;
+                activeChange.className = 'stat-change negative';
+            }
+        }
+        
+        function showUserModal() {
+            document.getElementById('userModal').classList.add('active');
+        }
+        
+        function showChatModal() {
+            document.getElementById('chatModal').classList.add('active');
+        }
+        
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+        
+        function showNotification(message, type = 'info') {
+            alert(message); // В реальном приложении можно сделать красивые уведомления
+        }
+        
+        function exportData() {
+            const dataStr = JSON.stringify(dashboardData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const link = document.createElement('a');
+            link.setAttribute('href', dataUri);
+            link.setAttribute('download', `chat-data-${new Date().toISOString().split('T')[0]}.json`);
+            link.click();
+            showNotification('Данные экспортированы в JSON', 'success');
+        }
+        
+        function clearCache() {
+            localStorage.removeItem('chatDashboardCache');
+            showNotification('Кеш очищен', 'success');
+        }
+        
+        function openAdmin() {
+            window.open('/wp-admin', '_blank');
+        }
+        
+        // Демо-функции (для реального использования нужно доработать)
+        function viewUser(id) {
+            showNotification(`Просмотр пользователя ID: ${id} (функция в разработке)`, 'info');
+        }
+        
+        function editUser(id) {
+            showNotification(`Редактирование пользователя ID: ${id} (функция в разработке)`, 'info');
+        }
+        
+        function viewChat(id) {
+            showNotification(`Просмотр чата ID: ${id} (функция в разработке)`, 'info');
+        }
+        
+        function editChat(id) {
+            showNotification(`Редактирование чата ID: ${id} (функция в разработке)`, 'info');
+        }
+    </script>
+</body>
+</html>

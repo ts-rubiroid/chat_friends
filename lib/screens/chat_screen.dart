@@ -178,6 +178,87 @@ class _ChatScreenState extends State<ChatScreen> {
     return ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac', 'opus'].contains(ext);
   }
 
+  /// Обработка долгого нажатия на сообщение.
+  /// Для своих сообщений показывает меню с действием «Удалить».
+  void _onMessageLongPress(Message message) async {
+    if (_currentUser == null || message.senderId != _currentUser!.id) {
+      // Пока разрешаем удалять только свои сообщения.
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.delete, color: Colors.red),
+                title: Text('Удалить сообщение'),
+                onTap: () => Navigator.pop(context, 'delete'),
+              ),
+              ListTile(
+                leading: Icon(Icons.close),
+                title: Text('Отмена'),
+                onTap: () => Navigator.pop(context, 'cancel'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (action == 'delete') {
+      await _confirmAndDeleteMessage(message);
+    }
+  }
+
+  Future<void> _confirmAndDeleteMessage(Message message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Удалить сообщение?'),
+          content: Text('Это действие удалит сообщение для всех участников чата.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Удалить',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final success = await ApiService.deleteMessage(message.id);
+    if (!mounted) return;
+
+    if (success) {
+      setState(() {
+        _messages.removeWhere((m) => m.id == message.id);
+        _lastKnownMessageCount = _messages.length;
+      });
+      _markChatAsRead();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Сообщение удалено')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось удалить сообщение')),
+      );
+    }
+  }
+
   Future<void> _pickPhotoFromGallery() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -904,166 +985,169 @@ class _ChatScreenState extends State<ChatScreen> {
                           final bool isMe = _currentUser != null && 
                                            message.senderId == _currentUser!.id;
                           
-                          return Container(
-                            margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                            child: Row(
-                              mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-                              children: [
-                                if (!isMe) ...[
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.grey.shade200,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '?',
-                                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          return GestureDetector(
+                            onLongPress: () => _onMessageLongPress(message),
+                            child: Container(
+                              margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                                children: [
+                                  if (!isMe) ...[
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Colors.grey.shade200,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '?',
+                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 8),
-                                ],
-                                
-                                Flexible(
-                                  child: Container(
-                                    padding: EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: isMe ? Colors.blue[100] : Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // БЛОК ДЛЯ ИЗОБРАЖЕНИЙ
-                                        if (hasImage && imageUrl.isNotEmpty)
-                                          Container(
-                                            margin: EdgeInsets.only(bottom: 8),
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                // Открываем полноэкранный просмотр
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) => ImageViewerScreen(
-                                                      imageUrl: imageUrl,
-                                                      heroTag: 'image_${message.id}',
-                                                      fileName: message.fileName ?? 'image_${message.id}.jpg',
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              child: Hero(
-                                                tag: 'image_${message.id}',
-                                                child: ClipRRect(
-                                                  borderRadius: BorderRadius.circular(12),
-                                                  child: Stack(
-                                                    children: [
-                                                      // Изображение
-                                                      Container(
-                                                        width: 250,
-                                                        height: 180,
-                                                        child: Image.network(
-                                                          imageUrl,
-                                                          fit: BoxFit.cover,
-                                                          loadingBuilder: (context, child, loadingProgress) {
-                                                            if (loadingProgress == null) return child;
-                                                            return Container(
-                                                              color: Colors.grey.shade200,
-                                                              child: Center(
-                                                                child: CircularProgressIndicator(
-                                                                  value: loadingProgress.expectedTotalBytes != null
-                                                                      ? loadingProgress.cumulativeBytesLoaded /
-                                                                          loadingProgress.expectedTotalBytes!
-                                                                      : null,
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
-                                                          errorBuilder: (context, error, stackTrace) {
-                                                            return Container(
-                                                              width: 250,
-                                                              height: 180,
-                                                              color: Colors.grey.shade200,
-                                                              child: Center(
-                                                                child: Column(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  children: [
-                                                                    Icon(Icons.broken_image, size: 40),
-                                                                    SizedBox(height: 8),
-                                                                    Text('Ошибка загрузки'),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            );
-                                                          },
-                                                        ),
+                                    SizedBox(width: 8),
+                                  ],
+                                  
+                                  Flexible(
+                                    child: Container(
+                                      padding: EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isMe ? Colors.blue[100] : Colors.grey.shade200,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // БЛОК ДЛЯ ИЗОБРАЖЕНИЙ
+                                          if (hasImage && imageUrl.isNotEmpty)
+                                            Container(
+                                              margin: EdgeInsets.only(bottom: 8),
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  // Открываем полноэкранный просмотр
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) => ImageViewerScreen(
+                                                        imageUrl: imageUrl,
+                                                        heroTag: 'image_${message.id}',
+                                                        fileName: message.fileName ?? 'image_${message.id}.jpg',
                                                       ),
-                                                      // Информация поверх изображения
-                                                      Positioned(
-                                                        bottom: 0,
-                                                        left: 0,
-                                                        right: 0,
-                                                        child: Container(
-                                                          padding: EdgeInsets.all(8),
-                                                          decoration: BoxDecoration(
-                                                            gradient: LinearGradient(
-                                                              begin: Alignment.bottomCenter,
-                                                              end: Alignment.topCenter,
-                                                              colors: [Colors.black54, Colors.transparent],
+                                                    ),
+                                                  );
+                                                },
+                                                child: Hero(
+                                                  tag: 'image_${message.id}',
+                                                  child: ClipRRect(
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    child: Stack(
+                                                      children: [
+                                                        // Изображение
+                                                        Container(
+                                                          width: 250,
+                                                          height: 180,
+                                                          child: Image.network(
+                                                            imageUrl,
+                                                            fit: BoxFit.cover,
+                                                            loadingBuilder: (context, child, loadingProgress) {
+                                                              if (loadingProgress == null) return child;
+                                                              return Container(
+                                                                color: Colors.grey.shade200,
+                                                                child: Center(
+                                                                  child: CircularProgressIndicator(
+                                                                    value: loadingProgress.expectedTotalBytes != null
+                                                                        ? loadingProgress.cumulativeBytesLoaded /
+                                                                            loadingProgress.expectedTotalBytes!
+                                                                        : null,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                            errorBuilder: (context, error, stackTrace) {
+                                                              return Container(
+                                                                width: 250,
+                                                                height: 180,
+                                                                color: Colors.grey.shade200,
+                                                                child: Center(
+                                                                  child: Column(
+                                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                                    children: [
+                                                                      Icon(Icons.broken_image, size: 40),
+                                                                      SizedBox(height: 8),
+                                                                      Text('Ошибка загрузки'),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                          ),
+                                                        ),
+                                                        // Информация поверх изображения
+                                                        Positioned(
+                                                          bottom: 0,
+                                                          left: 0,
+                                                          right: 0,
+                                                          child: Container(
+                                                            padding: EdgeInsets.all(8),
+                                                            decoration: BoxDecoration(
+                                                              gradient: LinearGradient(
+                                                                begin: Alignment.bottomCenter,
+                                                                end: Alignment.topCenter,
+                                                                colors: [Colors.black54, Colors.transparent],
+                                                              ),
+                                                            ),
+                                                            child: Row(
+                                                              children: [
+                                                                Icon(Icons.zoom_in, color: Colors.white, size: 16),
+                                                                SizedBox(width: 4),
+                                                                Text(
+                                                                  'Нажмите для увеличения',
+                                                                  style: TextStyle(
+                                                                    color: Colors.white,
+                                                                    fontSize: 12,
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
                                                           ),
-                                                          child: Row(
-                                                            children: [
-                                                              Icon(Icons.zoom_in, color: Colors.white, size: 16),
-                                                              SizedBox(width: 4),
-                                                              Text(
-                                                                'Нажмите для увеличения',
-                                                                style: TextStyle(
-                                                                  color: Colors.white,
-                                                                  fontSize: 12,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
                                                         ),
-                                                      ),
-                                                    ],
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        
-                                        // БЛОК ДЛЯ ФАЙЛОВ
-                                        if (hasFile && fileUrl.isNotEmpty)
-                                          _buildFileMessageBlock(message),
-                                        
-                                        // ТЕКСТ СООБЩЕНИЯ
-                                        if (message.text?.isNotEmpty == true)
+                                          
+                                          // БЛОК ДЛЯ ФАЙЛОВ
+                                          if (hasFile && fileUrl.isNotEmpty)
+                                            _buildFileMessageBlock(message),
+                                          
+                                          // ТЕКСТ СООБЩЕНИЯ
+                                          if (message.text?.isNotEmpty == true)
+                                            Text(
+                                              message.text!,
+                                              style: TextStyle(fontSize: 16),
+                                            ),
+                                          
+                                          // ВРЕМЯ СООБЩЕНИЯ
+                                          SizedBox(height: 4),
                                           Text(
-                                            message.text!,
-                                            style: TextStyle(fontSize: 16),
+                                            message.formattedTime,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
                                           ),
-                                        
-                                        // ВРЕМЯ СООБЩЕНИЯ
-                                        SizedBox(height: 4),
-                                        Text(
-                                          message.formattedTime,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                                
-                                if (isMe) SizedBox(width: 8),
-                              ],
+                                  
+                                  if (isMe) SizedBox(width: 8),
+                                ],
+                              ),
                             ),
                           );
                         },

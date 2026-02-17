@@ -75,13 +75,31 @@ function chat_register_complete_api() {
         'callback' => 'chat_api_send_message',
         'permission_callback' => 'chat_api_check_auth'
     ]);
+    
+    // Удаление сообщения (как в мессенджерах — удаление для всех)
+    register_rest_route('chat-api/v1', '/messages/(?P<id>\d+)/delete', [
+        'methods' => 'POST',
+        'callback' => 'chat_api_delete_message',
+        'permission_callback' => 'chat_api_check_auth'
+    ]);
+
+    // Удаление сообщения (альтернативный REST-вариант)
+    // Поддержка стандартного HTTP-метода DELETE:
+    // DELETE /chat-api/v1/messages/{id}
+    // Это помогает, если клиент/прокси не вызывает POST /.../delete.
+    register_rest_route('chat-api/v1', '/messages/(?P<id>\d+)', [
+        'methods' => WP_REST_Server::DELETABLE,
+        'callback' => 'chat_api_delete_message',
+        'permission_callback' => 'chat_api_check_auth'
+    ]);
+
     // Отметить сообщения как прочитанные (НОВЫЙ)
     register_rest_route('chat-api/v1', '/messages/mark-read', [
         'methods' => 'POST',
         'callback' => 'chat_api_mark_read',
         'permission_callback' => 'chat_api_check_auth'
     ]);
-        // Получить количество непрочитанных сообщений 
+    // Получить количество непрочитанных сообщений 
     register_rest_route('chat-api/v1', '/messages/unread-count', [
         'methods' => 'GET',
         'callback' => 'chat_api_unread_count',
@@ -98,6 +116,20 @@ function chat_register_complete_api() {
     register_rest_route('chat-api/v1', '/users', [
         'methods' => 'GET',
         'callback' => 'chat_api_get_users',
+        'permission_callback' => 'chat_api_check_auth'
+    ]);
+    
+    // Обновление профиля текущего пользователя (или любого chat_user для master-пользователя)
+    register_rest_route('chat-api/v1', '/users/update', [
+        'methods' => 'POST',
+        'callback' => 'chat_api_update_profile',
+        'permission_callback' => 'chat_api_check_auth'
+    ]);
+    
+    // Удаление (перемещение в корзину) профиля текущего пользователя
+    register_rest_route('chat-api/v1', '/users/delete', [
+        'methods' => 'POST',
+        'callback' => 'chat_api_delete_profile',
         'permission_callback' => 'chat_api_check_auth'
     ]);
     
@@ -243,6 +275,8 @@ function chat_api_test() {
             '/chat-api/v1/chats/{id}/creator' => 'GET - Создатель чата',
             '/chat-api/v1/messages' => 'GET - Сообщения чата',
             '/chat-api/v1/messages/send' => 'POST - Отправить сообщение',
+            '/chat-api/v1/messages/{id}/delete' => 'POST - Удалить сообщение',
+            '/chat-api/v1/messages/{id}' => 'DELETE - Удалить сообщение (REST)',
             '/chat-api/v1/messages/mark-read' => 'POST - Отметить прочитанными',
             '/chat-api/v1/messages/unread-count' => 'GET - Непрочитанные',
             '/chat-api/v1/messages/search' => 'GET - Поиск сообщений',
@@ -266,6 +300,9 @@ function chat_api_get_me($request) {
             'phone' => 'master',
             'first_name' => 'Master',
             'last_name' => 'User',
+            'middle_name' => '',
+            'nickname' => 'master',
+            'position' => '',
             'avatar' => '',
             'created_at' => current_time('mysql')
         ];
@@ -309,7 +346,9 @@ function chat_api_get_me($request) {
             'phone' => get_field('phone', $user_id),
             'first_name' => get_field('first_name', $user_id),
             'last_name' => get_field('last_name', $user_id),
+            'middle_name' => get_field('middle_name', $user_id),
             'nickname' => get_field('nickname', $user_id),
+            'position' => get_field('position', $user_id),
             'avatar' => $avatar_value, // Теперь всегда строка
             'created_at' => get_field('created_at', $user_id) ?: $user->post_date
         ]
@@ -715,6 +754,81 @@ function chat_api_send_message($request) {
     ];
 }
 
+/**
+ * Удаление сообщения.
+ * Разрешено:
+ * - отправителю сообщения;
+ * - master-токену (user_id = 999).
+ * При успешном удалении сообщение переносится в корзину (wp_trash_post),
+ * в выборке сообщений (chat_api_get_messages) оно больше не появляется.
+ */
+function chat_api_delete_message($request) {
+    $user_id = chat_api_get_user_id($request);
+    
+    if (!$user_id) {
+        return new WP_Error('unauthorized', 'Требуется авторизация', ['status' => 401]);
+    }
+    
+    $message_id = isset($request['id']) ? intval($request['id']) : 0;
+    
+    if (!$message_id) {
+        return new WP_Error('missing_message_id', 'ID сообщения обязателен', ['status' => 400]);
+    }
+    
+    $message = get_post($message_id);
+    if (!$message || $message->post_type !== 'chat_message') {
+        return new WP_Error('message_not_found', 'Сообщение не найдено', ['status' => 404]);
+    }
+    
+    // Определяем чат и участников для проверки доступа
+    // ВАЖНО: избегаем get_field() здесь, потому что при некоторых настройках ACF
+    // (и включенном WP_DEBUG_DISPLAY) ACF может выбрасывать Warning и ломать JSON-ответ.
+    // Читаем данные напрямую из post_meta и нормализуем типы.
+    $chat_id = get_post_meta($message_id, 'chat', true);
+    if (is_array($chat_id)) {
+        $chat_id = !empty($chat_id) ? intval($chat_id[0]) : 0;
+    } else {
+        $chat_id = intval($chat_id);
+    }
+
+    if (!$chat_id) {
+        return new WP_Error('chat_not_found', 'Чат не найден для сообщения', ['status' => 404]);
+    }
+    
+    $members = get_post_meta($chat_id, 'members', true);
+    if (!is_array($members)) {
+        $members = [];
+    }
+    // Нормализуем к int, чтобы in_array работал предсказуемо
+    $members = array_map('intval', $members);
+
+    if (!in_array(intval($user_id), $members)) {
+        return new WP_Error('no_access', 'Нет доступа к этому чату', ['status' => 403]);
+    }
+    
+    // Проверяем, что удаляет либо сам отправитель, либо master-пользователь
+    $sender_id = get_post_meta($message_id, 'sender', true);
+    if (is_array($sender_id)) {
+        $sender_id = !empty($sender_id) ? intval($sender_id[0]) : 0;
+    } else {
+        $sender_id = intval($sender_id);
+    }
+    
+    if ($user_id !== 999 && $sender_id !== $user_id) {
+        return new WP_Error('forbidden', 'Можно удалять только свои сообщения', ['status' => 403]);
+    }
+    
+    // Переносим в корзину (в выборке сообщений больше не появится)
+    wp_trash_post($message_id);
+    
+    return [
+        'success' => true,
+        'message' => 'Сообщение удалено',
+        'message_id' => $message_id,
+        'chat_id' => $chat_id,
+    ];
+}
+
 function chat_api_get_users($request) {
     $user_id = chat_api_get_user_id($request);
     
@@ -763,7 +877,9 @@ function chat_api_get_users($request) {
             'phone' => get_field('phone', $user_id_post),
             'first_name' => get_field('first_name', $user_id_post),
             'last_name' => get_field('last_name', $user_id_post),
+            'middle_name' => get_field('middle_name', $user_id_post),
             'nickname' => get_field('nickname', $user_id_post),
+            'position' => get_field('position', $user_id_post),
             'avatar' => $avatar_value, // Теперь всегда строка
             'created_at' => get_field('created_at', $user_id_post)
         ];
@@ -773,6 +889,213 @@ function chat_api_get_users($request) {
         'success' => true,
         'users' => $result,
         'count' => count($result)
+    ];
+}
+
+/**
+ * Обновление профиля пользователя.
+ *
+ * Правила:
+ * - Обычный пользователь может изменять ТОЛЬКО свой профиль и не может менять телефон.
+ * - Master-пользователь (token вида master_*) может изменять любой chat_user и его телефон.
+ */
+function chat_api_update_profile($request) {
+    $current_user_id = chat_api_get_user_id($request);
+    if (!$current_user_id) {
+        return new WP_Error('unauthorized', 'Требуется авторизация', ['status' => 401]);
+    }
+
+    $params = $request->get_json_params();
+    if (!is_array($params)) {
+        $params = $request->get_params();
+    }
+
+    $target_user_id = $current_user_id;
+
+    // Master-пользователь может редактировать любой профиль по user_id
+    if ($current_user_id === 999 && !empty($params['user_id'])) {
+        $target_user_id = intval($params['user_id']);
+    }
+
+    $user_post = get_post($target_user_id);
+    if (!$user_post || $user_post->post_type !== 'chat_user') {
+        return new WP_Error('user_not_found', 'Пользователь не найден', ['status' => 404]);
+    }
+
+    // Обычный пользователь не может редактировать чужой профиль
+    if ($current_user_id !== 999 && $target_user_id !== $current_user_id) {
+        return new WP_Error('forbidden', 'Можно изменять только свой профиль', ['status' => 403]);
+    }
+
+    $fields_to_update = [];
+
+    // Имя, фамилия, отчество, никнейм, должность
+    if (isset($params['first_name'])) {
+        $fields_to_update['first_name'] = sanitize_text_field($params['first_name']);
+    }
+    if (isset($params['last_name'])) {
+        $fields_to_update['last_name'] = sanitize_text_field($params['last_name']);
+    }
+    if (isset($params['middle_name'])) {
+        $fields_to_update['middle_name'] = sanitize_text_field($params['middle_name']);
+    }
+    if (isset($params['nickname'])) {
+        $fields_to_update['nickname'] = sanitize_text_field($params['nickname']);
+    }
+    if (isset($params['position'])) {
+        $fields_to_update['position'] = sanitize_text_field($params['position']);
+    }
+
+    // Телефон:
+    // - обычный пользователь: запрещено;
+    // - master (999): может менять, с проверкой уникальности.
+    if (isset($params['phone']) && $current_user_id === 999) {
+        $new_phone = sanitize_text_field($params['phone']);
+        if (!empty($new_phone)) {
+            // Проверяем, что телефон не занят другим пользователем
+            $existing = get_posts([
+                'post_type' => 'chat_user',
+                'posts_per_page' => 1,
+                'meta_query' => [
+                    [
+                        'key' => 'phone',
+                        'value' => $new_phone,
+                        'compare' => '=',
+                    ],
+                ],
+            ]);
+
+            if (!empty($existing) && intval($existing[0]->ID) !== $target_user_id) {
+                return new WP_Error('phone_exists', 'Пользователь с таким телефоном уже существует', ['status' => 409]);
+            }
+
+            $fields_to_update['phone'] = $new_phone;
+        }
+    }
+
+    // Аватар: ожидаем, что Flutter пришлёт ПОЛНЫЙ URL (как при регистрации).
+    if (isset($params['avatar'])) {
+        $avatar_value = trim($params['avatar']);
+        if ($avatar_value === '' || $avatar_value === 'null' || $avatar_value === 'false') {
+            $fields_to_update['avatar'] = '';
+            delete_post_meta($target_user_id, 'avatar_url');
+        } else {
+            $avatar_url = esc_url_raw($avatar_value);
+            $avatar_id = 0;
+
+            // Пытаемся получить attachment ID по URL — как при регистрации
+            if (function_exists('attachment_url_to_postid')) {
+                $avatar_id = attachment_url_to_postid($avatar_url);
+            }
+
+            if ($avatar_id) {
+                // Для ACF Image-поля корректно сохранять ID
+                $fields_to_update['avatar'] = $avatar_id;
+            } else {
+                // Фолбэк: сохраняем URL — ACF иногда сам сопоставляет его с ID
+                $fields_to_update['avatar'] = $avatar_url;
+            }
+
+            // Дополнительно сохраняем явный URL в meta-поле (как в регистрации)
+            update_post_meta($target_user_id, 'avatar_url', $avatar_url);
+        }
+    }
+
+    foreach ($fields_to_update as $key => $value) {
+        update_field($key, $value, $target_user_id);
+    }
+
+    // Возвращаем обновлённого пользователя в том же формате, что и /me
+    $dummy_request = new WP_REST_Request('GET', '/chat-api/v1/me');
+    // Подделывать заголовки authorization не нужно, мы знаем ID
+    // поэтому просто собираем данные напрямую:
+
+    // Готовим avatar для ответа в виде ПОЛНОГО URL, как в chat_auth_register
+    $saved_avatar = get_field('avatar', $target_user_id);
+
+    // Если ACF вернул ID (для Image-поля) — преобразуем в URL
+    if (!empty($saved_avatar) && is_numeric($saved_avatar)) {
+        $attachment_url = wp_get_attachment_url(intval($saved_avatar));
+        if ($attachment_url) {
+            $saved_avatar = $attachment_url;
+        }
+    }
+
+    // Фолбэк: если ACF ничего не вернул, пробуем meta avatar_url
+    if (empty($saved_avatar)) {
+        $meta_avatar_url = get_post_meta($target_user_id, 'avatar_url', true);
+        if (!empty($meta_avatar_url)) {
+            $saved_avatar = $meta_avatar_url;
+        }
+    }
+
+    $response_user = [
+        'id' => $target_user_id,
+        'phone' => get_field('phone', $target_user_id),
+        'first_name' => get_field('first_name', $target_user_id),
+        'last_name' => get_field('last_name', $target_user_id),
+        'middle_name' => get_field('middle_name', $target_user_id),
+        'nickname' => get_field('nickname', $target_user_id),
+        'position' => get_field('position', $target_user_id),
+        'avatar' => $saved_avatar ?: '',
+        'created_at' => get_field('created_at', $target_user_id) ?: $user_post->post_date,
+    ];
+
+    return [
+        'success' => true,
+        'message' => 'Профиль обновлён',
+        'user' => $response_user,
+    ];
+}
+
+/**
+ * Удаление (перемещение в корзину) профиля пользователя.
+ *
+ * - Обычный пользователь может удалить только себя.
+ * - Master-пользователь может удалить любого chat_user по user_id.
+ */
+function chat_api_delete_profile($request) {
+    $current_user_id = chat_api_get_user_id($request);
+    if (!$current_user_id) {
+        return new WP_Error('unauthorized', 'Требуется авторизация', ['status' => 401]);
+    }
+
+    $params = $request->get_json_params();
+    if (!is_array($params)) {
+        $params = $request->get_params();
+    }
+
+    $target_user_id = $current_user_id;
+    if ($current_user_id === 999 && !empty($params['user_id'])) {
+        $target_user_id = intval($params['user_id']);
+    }
+
+    // Нельзя удалять "виртуального" master-пользователя
+    if ($target_user_id === 999) {
+        return new WP_Error('forbidden', 'Нельзя удалить master-пользователя', ['status' => 403]);
+    }
+
+    $user_post = get_post($target_user_id);
+    if (!$user_post || $user_post->post_type !== 'chat_user') {
+        return new WP_Error('user_not_found', 'Пользователь не найден', ['status' => 404]);
+    }
+
+    // Обычный пользователь может удалить только себя
+    if ($current_user_id !== 999 && $target_user_id !== $current_user_id) {
+        return new WP_Error('forbidden', 'Можно удалить только свой профиль', ['status' => 403]);
+    }
+
+    // Перемещаем в корзину (soft-delete, чтобы можно было восстановить из админки)
+    $trashed = wp_trash_post($target_user_id);
+
+    if (!$trashed) {
+        return new WP_Error('delete_failed', 'Не удалось переместить профиль в корзину', ['status' => 500]);
+    }
+
+    return [
+        'success' => true,
+        'message' => 'Профиль перемещён в корзину',
+        'user_id' => $target_user_id,
     ];
 }
 
