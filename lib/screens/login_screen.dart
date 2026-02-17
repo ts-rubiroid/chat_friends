@@ -34,18 +34,41 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        await ApiService.login(
+        final result = await ApiService.login(
           _phoneController.text.trim(),
           _passwordController.text.trim(),
         );
-        
+
+        // Если запрос завершился, но API вернул ошибку (401, 403 и т.п.) —
+        // не пускаем в приложение, а показываем понятное сообщение.
+        final bool ok = (result['success'] == true) || result.containsKey('token');
+        if (!ok) {
+          final status = result['statusCode'];
+          final backendMessage = result['error'] ?? result['message'];
+
+          // Для 401 показываем стандартное сообщение о неверных данных,
+          // не "ломая" пользователя техническими текстами WordPress.
+          final friendly = status == 401
+              ? 'Неверный телефон или пароль. Проверьте данные и попробуйте ещё раз.'
+              : (backendMessage?.toString().isNotEmpty == true
+                  ? backendMessage.toString()
+                  : 'Не удалось войти. Попробуйте ещё раз.');
+
+          setState(() {
+            _error = friendly;
+          });
+          return;
+        }
+
+        if (!mounted) return;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => ChatsScreen()),
         );
       } catch (e) {
         setState(() {
-          _error = e.toString();
+          // Сетевые/непредвиденные ошибки — отдельным сообщением
+          _error = 'Ошибка входа: ${e.toString()}';
         });
       } finally {
         setState(() {

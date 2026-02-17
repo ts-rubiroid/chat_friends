@@ -2,7 +2,7 @@
 
 ## 🎯 Статус: **ПРОДАКШЕН ГОТОВ**
 
-**Последнее обновление:** 28 января 2026 года  
+**Последнее обновление:** 17 февраля 2026 года  
 **Версия:** 3.0  
 **Статус:** ✅ Все endpoints работают
 
@@ -425,6 +425,46 @@ offset=0                    # опционально
 bash
 curl -X GET "https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/search?q=привет&chat_id=260" \
   -H "Authorization: Bearer user_259_e7f4d02c3f703f50ca87d790133e04f8"
+6. 🗑️ Удалить сообщение
+
+Основной endpoint:
+
+Endpoint: POST /chat-api/v1/messages/{id}/delete
+
+Альтернативный REST-вариант:
+
+Endpoint: DELETE /chat-api/v1/messages/{id}
+
+Параметры:
+
+- `id` — ID сообщения (обязательно, указывается в URL)
+
+Правила доступа:
+
+- Сообщение может удалить **только отправитель** или **master-пользователь** (токен вида `master_...`).
+- Пользователь должен быть участником чата, к которому относится сообщение.
+
+Поведение:
+
+- При успешном удалении сообщение перемещается в корзину WordPress (`wp_trash_post`), и больше не попадает в выборку `/messages`.
+
+Пример запроса (POST-вариант):
+
+```bash
+curl -X POST "https://chat.remont-gazon.ru/wp-json/chat-api/v1/messages/888/delete" \
+  -H "Authorization: Bearer user_259_e7f4d02c3f703f50ca87d790133e04f8"
+```
+
+Ответ:
+
+```json
+{
+  "success": true,
+  "message": "Сообщение удалено",
+  "message_id": 888,
+  "chat_id": 260
+}
+```
 👥 ПОЛЬЗОВАТЕЛИ ✅ РАБОТАЕТ
 1. 👨‍👩‍👧‍👦 Получить всех пользователей
 Endpoint: GET /chat-api/v1/users
@@ -442,8 +482,10 @@ json
       "phone": "+79161234567",
       "first_name": "Иван",
       "last_name": "Иванов",
+      "middle_name": "Иванович",
       "nickname": "ivan",
-      "avatar": null,
+      "position": "Менеджер",
+      "avatar": "https://chat.remont-gazon.ru/wp-content/uploads/2026/01/avatar.jpg",
       "created_at": "2026-01-28 10:09:17"
     }
   ],
@@ -452,15 +494,36 @@ json
 2. 👤 Получить текущего пользователя
 Endpoint: GET /chat-api/v1/me
 
-Flutter модель пользователя:
+Пример ответа:
 
-dart
+```json
+{
+  "success": true,
+  "user": {
+    "id": 259,
+    "phone": "+79161234567",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "middle_name": "Иванович",
+    "nickname": "ivan",
+    "position": "Менеджер",
+    "avatar": "https://chat.remont-gazon.ru/wp-content/uploads/2026/01/avatar.jpg",
+    "created_at": "2026-01-28 10:09:17"
+  }
+}
+```
+
+Обновлённая Flutter-модель пользователя (упрощённый пример):
+
+```dart
 class User {
   final int id;
   final String phone;
   final String firstName;
   final String lastName;
+  final String? middleName;
   final String? nickname;
+  final String? position;
   final String? avatar;
   final String createdAt;
   
@@ -469,7 +532,9 @@ class User {
     required this.phone,
     required this.firstName,
     required this.lastName,
+    this.middleName,
     this.nickname,
+    this.position,
     this.avatar,
     required this.createdAt,
   });
@@ -480,16 +545,110 @@ class User {
       phone: json['phone'] ?? '',
       firstName: json['first_name'] ?? '',
       lastName: json['last_name'] ?? '',
+      middleName: json['middle_name'],
       nickname: json['nickname'],
+      position: json['position'],
       avatar: json['avatar'],
       createdAt: json['created_at'] ?? '',
     );
   }
-  
-  String get fullName => '$firstName $lastName'.trim();
-  String get avatarUrl => avatar != null ? '$avatar' : '';
-  String get initials => '${firstName.isNotEmpty ? firstName[0] : ''}${lastName.isNotEmpty ? lastName[0] : ''}';
 }
+```
+
+3. ✏️ Обновить профиль пользователя
+
+Endpoint: POST /chat-api/v1/users/update
+
+Назначение: обновление профиля текущего пользователя (или любого `chat_user` для master-пользователя).
+
+Правила:
+
+- Обычный пользователь может изменять **только свой** профиль.
+- Обычный пользователь **не может** менять номер телефона.
+- Master-пользователь (`master_...`) может изменять профиль любого `chat_user` и номер телефона (с проверкой уникальности).
+
+Параметры (JSON-тело, все поля опциональны):
+
+```json
+{
+  "first_name": "Иван",
+  "last_name": "Иванов",
+  "middle_name": "Иванович",
+  "nickname": "ivan",
+  "position": "Менеджер",
+  "avatar": "https://chat.remont-gazon.ru/wp-content/uploads/2026/01/avatar.jpg"
+}
+```
+
+Дополнительно для master-пользователя:
+
+```json
+{
+  "user_id": 259,
+  "phone": "+79161234567",
+  "first_name": "Иван",
+  "last_name": "Иванов",
+  "position": "Руководитель отдела"
+}
+```
+
+Пример ответа:
+
+```json
+{
+  "success": true,
+  "message": "Профиль обновлён",
+  "user": {
+    "id": 259,
+    "phone": "+79161234567",
+    "first_name": "Иван",
+    "last_name": "Иванов",
+    "middle_name": "Иванович",
+    "nickname": "ivan",
+    "position": "Руководитель отдела",
+    "avatar": "https://chat.remонт-gazon.ru/wp-content/uploads/2026/01/avatar.jpg",
+    "created_at": "2026-01-28 10:09:17"
+  }
+}
+```
+
+4. 🗑️ Удалить профиль пользователя
+
+Endpoint: POST /chat-api/v1/users/delete
+
+Назначение: перемещение `chat_user` в корзину WordPress (soft-delete профиля).
+
+Правила:
+
+- Обычный пользователь может удалить **только свой** профиль.
+- Master-пользователь может удалить любой `chat_user` по `user_id`.
+- Master-пользователь (виртуальный, `id = 999`) не может быть удалён.
+
+Параметры:
+
+- Без параметров — удалить профиль текущего пользователя:
+
+```json
+{}
+```
+
+- Для master-пользователя:
+
+```json
+{
+  "user_id": 259
+}
+```
+
+Ответ:
+
+```json
+{
+  "success": true,
+  "message": "Профиль перемещён в корзину",
+  "user_id": 259
+}
+```
 📎 ФАЙЛЫ ✅ РАБОТАЕТ
 1. 📤 Загрузить файл
 Endpoint: POST /chat-api/v1/upload

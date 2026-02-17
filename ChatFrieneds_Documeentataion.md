@@ -70,6 +70,7 @@ lib/
 | lastName   | String?     | Фамилия                                  |
 | middleName | String?     | Отчество                                 |
 | nickname   | String?     | Никнейм                                  |
+| position   | String?     | Должность (позиция/роль в компании)      |
 | avatar     | String?     | URL аватара (полный или относительный)   |
 | createdAt  | DateTime?   | Дата регистрации                         |
 
@@ -120,19 +121,23 @@ lib/
 
 ### 5.2 Endpoints
 
-| Метод        | Endpoint                          | Описание                              |
-|--------------|-----------------------------------|---------------------------------------|
-| POST         | /chat/v1/auth/login               | Вход (phone, password)                |
-| POST         | /chat/v1/auth/register            | Регистрация (phone, password, avatar и др.) |
-| GET          | /chat-api/v1/me                   | Текущий пользователь                  |
-| GET          | /chat-api/v1/users                | Список пользователей                  |
-| GET          | /chat-api/v1/chats                | Список чатов                          |
-| GET          | /chat-api/v1/chats/{id}           | Детали чата                           |
-| POST         | /chat-api/v1/chats/create         | Создание чата                         |
-| GET          | /chat-api/v1/chats/{id}/creator   | Создатель чата                        |
-| GET          | /chat-api/v1/messages?chat_id=X   | Сообщения чата                        |
-| POST         | /chat-api/v1/messages/send        | Отправка сообщения                    |
-| POST         | /chat-api/v1/upload               | Загрузка файла (multipart/form-data)  |
+| Метод        | Endpoint                                | Описание                                          |
+|--------------|-----------------------------------------|---------------------------------------------------|
+| POST         | /chat/v1/auth/login                     | Вход (phone, password)                            |
+| POST         | /chat/v1/auth/register                  | Регистрация (phone, password, avatar и др.)       |
+| GET          | /chat-api/v1/me                         | Текущий пользователь                              |
+| GET          | /chat-api/v1/users                      | Список пользователей (без текущего)               |
+| POST         | /chat-api/v1/users/update               | Обновление профиля (имя, фамилия, отчество, ник, должность, аватар) |
+| POST         | /chat-api/v1/users/delete               | Удаление (soft-delete) профиля пользователя       |
+| GET          | /chat-api/v1/chats                      | Список чатов                                      |
+| GET          | /chat-api/v1/chats/{id}                 | Детали чата                                       |
+| POST         | /chat-api/v1/chats/create               | Создание чата                                     |
+| GET          | /chat-api/v1/chats/{id}/creator         | Создатель чата                                    |
+| GET          | /chat-api/v1/messages?chat_id=X         | Сообщения чата                                    |
+| POST         | /chat-api/v1/messages/send              | Отправка сообщения                                |
+| POST         | /chat-api/v1/messages/{id}/delete       | Удаление сообщения (стандартный вариант)          |
+| DELETE       | /chat-api/v1/messages/{id}              | Удаление сообщения (альтернативный REST-вариант)  |
+| POST         | /chat-api/v1/upload                     | Загрузка файла (multipart/form-data)              |
 
 ### 5.3 Аутентификация
 
@@ -159,7 +164,7 @@ lib/
 
 ### 5.5 Специфика WordPress / ACF
 
-- Пользователи — CPT `chat_user`, поля в ACF (phone, password, avatar, first_name, last_name, nickname).
+- Пользователи — CPT `chat_user`, поля в ACF (phone, password, avatar, first_name, last_name, middle_name, nickname, position, created_at, user_id).
 - Чаты — CPT `chat`, поля: is_group, members, created_at, avatar.
 - Сообщения — CPT `chat_message`, поля: chat, sender, text, image, file, created_at.
 - Поле `avatar` (тип Image) хранит attachment ID; при приёме URL бэкенд преобразует его в ID через `attachment_url_to_postid()`.
@@ -186,7 +191,10 @@ lib/
   - для `type = 'image'` сервер ожидает `image_url` и сохраняет значение в поле `image`;  
   - для `type = 'file'` сервер ожидает `file_url` и сохраняет значение в поле `file` (это может быть документ, видео или аудио файл).  
 - `uploadFile(file, {fileName})` — загрузка файла (любой поддерживаемый тип: изображение, документ, видео или аудио).  
-- `uploadAvatar(imageFile)` — загрузка аватара.
+- `uploadAvatar(imageFile)` — загрузка аватара (при регистрации и при редактировании профиля).
+- `updateProfile(data)` — обновление профиля текущего пользователя (имя, фамилия, отчество, никнейм, должность, аватар; телефон менять нельзя).
+- `deleteProfile()` — удаление (soft-delete) профиля текущего пользователя, с последующим выходом из приложения.
+- `deleteMessage(messageId)` — удаление сообщения текущего пользователя (если он отправитель или master).
 
 ### 6.2 MediaStorage (`lib/services/media_storage.dart`)
 
@@ -257,6 +265,15 @@ lib/
      - вызывается `ApiService.uploadFile(file)` (POST `/chat-api/v1/upload`),  
      - далее `ApiService.sendMessageWithFile(chatId, text, file, type)` (для видео/аудио используется `type = 'file'`).  
   4. Параллельно `MediaStorage.saveMediaForMessage(messageId, ...)` сохраняет локальные ссылки и метаданные, чтобы при последующих запросах сообщений можно было восстановить превью даже при неполном ответе сервера.
+ - **Профиль пользователя:**  
+   1. Пользователь на `ChatsScreen` нажимает иконку профиля → открывается `ProfileScreen`.  
+   2. На экране профиля можно:
+      - просмотреть аватар, ФИО, никнейм, должность, телефон, дату регистрации;
+      - изменить ФИО (фамилия, имя, отчество), никнейм, должность;
+      - выбрать новый аватар из галереи (через `ApiService.uploadAvatar` + `updateProfile`);
+      - выйти из аккаунта (кнопка «Выйти»);
+      - удалить свой профиль (soft-delete в WordPress, перемещение `chat_user` в корзину через `/chat-api/v1/users/delete`).  
+   3. После удаления профиля выполняется `logout`, и пользователь попадает на экран входа.
 
 ---
 
