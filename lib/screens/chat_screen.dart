@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:chat_friends/utils/local_unread_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/message.dart';
@@ -35,6 +38,12 @@ class _ChatScreenState extends State<ChatScreen> {
   User? _currentUser;
   int _lastKnownMessageCount = 0;
 
+  // Голосовые сообщения
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecordingVoice = false;
+  int _recordSeconds = 0;
+  Timer? _recordTimer;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +60,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
+    if (_isRecordingVoice) {
+      _audioRecorder.stop().catchError((_) => null);
+    }
+    _audioRecorder.dispose();
     NotificationService.currentChatId = null;
     _markChatAsRead();
     _messageController.dispose();
@@ -340,6 +354,70 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _startVoiceRecord() async {
+    final hasPermission = await _audioRecorder.hasPermission();
+    if (!hasPermission) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нет доступа к микрофону. Разрешите запись в настройках.')),
+      );
+      return;
+    }
+    try {
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _audioRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+      if (!mounted) return;
+      setState(() {
+        _isRecordingVoice = true;
+        _recordSeconds = 0;
+      });
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+        if (!mounted) return;
+        setState(() => _recordSeconds = t.tick);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка записи: $e')),
+      );
+    }
+  }
+
+  Future<void> _stopVoiceRecord() async {
+    if (!_isRecordingVoice) return;
+    _recordTimer?.cancel();
+    _recordTimer = null;
+    try {
+      final path = await _audioRecorder.stop();
+      if (!mounted) return;
+      if (path == null || path.isEmpty) {
+        setState(() {
+          _isRecordingVoice = false;
+          _recordSeconds = 0;
+        });
+        return;
+      }
+      setState(() {
+        _isRecordingVoice = false;
+        _recordSeconds = 0;
+        _pendingAttachment = _PendingAttachment(
+          type: _PendingAttachmentType.audio,
+          file: File(path),
+        );
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRecordingVoice = false;
+        _recordSeconds = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка остановки записи: $e')),
+      );
+    }
+  }
+
   void _showAttachmentPickerSheet() {
     showModalBottomSheet(
       context: context,
@@ -372,6 +450,15 @@ class _ChatScreenState extends State<ChatScreen> {
               onTap: () async {
                 Navigator.pop(context);
                 await _pickVideoFromGallery();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.mic, color: Colors.red),
+              title: Text('Голосовое сообщение'),
+              subtitle: Text('Записать с микрофона'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _startVoiceRecord();
               },
             ),
             ListTile(
@@ -940,6 +1027,28 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_isRecordingVoice)
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              color: Colors.red.shade50,
+              child: Row(
+                children: [
+                  Icon(Icons.mic, color: Colors.red, size: 28),
+                  SizedBox(width: 12),
+                  Text(
+                    'Запись ${_recordSeconds ~/ 60}:${(_recordSeconds % 60).toString().padLeft(2, '0')}',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red.shade800),
+                  ),
+                  Spacer(),
+                  TextButton.icon(
+                    onPressed: _stopVoiceRecord,
+                    icon: Icon(Icons.stop, color: Colors.white, size: 20),
+                    label: Text('Стоп', style: TextStyle(color: Colors.white)),
+                    style: TextButton.styleFrom(backgroundColor: Colors.red),
+                  ),
+                ],
+              ),
+            ),
           if (_pendingAttachment != null)
             Container(
               padding: EdgeInsets.all(10),

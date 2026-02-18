@@ -1515,8 +1515,28 @@ function chat_api_upload($request) {
         return new WP_Error('file_too_large', 'Файл слишком большой (макс. 10MB)', ['status' => 400]);
     }
     
-    // Разрешенные MIME-типы (расширено: добавлены видео и аудио)
-    $allowed_types = [
+    // Некоторые хостинги/окружения определяют MIME для m4a нестабильно:
+    // audio/mp4a-latm, audio/x-m4a, video/mp4, application/octet-stream и т.п.
+    // Поэтому валидируем по расширению + проверяем MIME максимально безопасно/предсказуемо.
+    $original_name = isset($file['name']) ? (string)$file['name'] : '';
+    $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+
+    $allowed_exts = [
+        // images
+        'jpg', 'jpeg', 'png', 'gif',
+        // documents / text
+        'pdf', 'txt',
+        // video
+        'mp4', 'mov', 'webm',
+        // audio
+        'mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga',
+    ];
+
+    if (empty($ext) || !in_array($ext, $allowed_exts, true)) {
+        return new WP_Error('invalid_file_type', 'Недопустимое расширение файла', ['status' => 400]);
+    }
+
+    $allowed_mimes = [
         // images
         'image/jpeg',
         'image/png',
@@ -1528,46 +1548,106 @@ function chat_api_upload($request) {
         'video/mp4',
         'video/quicktime', // mov
         'video/webm',
-        // audio
+        // audio (основные)
         'audio/mpeg', // mp3
         'audio/mp4',  // m4a
         'audio/aac',
         'audio/wav',
         'audio/ogg',
         'audio/webm',
+        // audio (варианты, которые встречаются на некоторых хостингах)
+        'audio/x-m4a',
+        'audio/mp4a-latm',
+        'audio/x-wav',
+        'audio/x-aac',
     ];
 
-    // mime_content_type() может возвращать неожиданные значения на некоторых хостингах,
-    // но в большинстве случаев подходит для проверки типов загружаемых медиа.
-    $file_type = mime_content_type($file['tmp_name']);
-    
-    if (!in_array($file_type, $allowed_types)) {
-        return new WP_Error('invalid_file_type', 'Недопустимый тип файла', ['status' => 400]);
+    $detected_mime = '';
+    if (function_exists('mime_content_type')) {
+        $tmp = isset($file['tmp_name']) ? (string)$file['tmp_name'] : '';
+        if (!empty($tmp)) {
+            $detected_mime = (string) mime_content_type($tmp);
+        }
     }
+
+    $wp_checked_type = '';
+    if (function_exists('wp_check_filetype_and_ext')) {
+        $checked = wp_check_filetype_and_ext($file['tmp_name'], $original_name);
+        if (is_array($checked) && !empty($checked['type'])) {
+            $wp_checked_type = (string) $checked['type'];
+        }
+    }
+
+    // Берём наиболее надёжный MIME (если WordPress смог определить — используем его)
+    $effective_mime = !empty($wp_checked_type) ? $wp_checked_type : $detected_mime;
+
+    $mime_ok = in_array($effective_mime, $allowed_mimes, true);
+    // Если MIME определить не удалось, разрешаем только "безопасные" расширения из allowlist выше.
+    // Для m4a дополнительно допускаем типы, которые часто ошибочно прилетают.
+    if (!$mime_ok) {
+        if ($ext === 'm4a' && in_array($effective_mime, ['video/mp4', 'application/octet-stream', ''], true)) {
+            $mime_ok = true;
+        }
+        if ($ext === 'mp4' && $effective_mime === 'application/octet-stream') {
+            $mime_ok = true;
+        }
+    }
+
+    if (!$mime_ok) {
+        return new WP_Error(
+            'invalid_file_type',
+            'Недопустимый тип файла (' . $effective_mime . ') для .' . $ext,
+            ['status' => 400]
+        );
+    }
+
+    // Для ответа/метаданных используем effective_mime (а не только mime_content_type())
+    $file_type = $effective_mime;
     
     require_once(ABSPATH . 'wp-admin/includes/file.php');
     require_once(ABSPATH . 'wp-admin/includes/image.php');
     // ВАЖНО: для аудио/видео WordPress может вызывать wp_read_audio_metadata()/wp_read_video_metadata()
     // которые определены в media.php (и могут не быть подключены).
     require_once(ABSPATH . 'wp-admin/includes/media.php');
-    
-    $upload_overrides = ['test_form' => false];
-    $movefile = wp_handle_upload($file, $upload_overrides);
-    
-    if (isset($movefile['error'])) {
-        return new WP_Error('upload_failed', $movefile['error'], ['status' => 500]);
+
+    // ==== РУЧНАЯ ЗАГРУЗКА ФАЙЛА (БЕЗ wp_handle_upload, которое режет по типу) ====
+    $upload_dir = wp_upload_dir();
+    if (!empty($upload_dir['error'])) {
+        return new WP_Error(
+            'upload_failed',
+            'Ошибка каталога загрузки: ' . $upload_dir['error'],
+            ['status' => 500]
+        );
     }
-    
+
+    $upload_path = $upload_dir['path'];
+    if (!file_exists($upload_path)) {
+        wp_mkdir_p($upload_path);
+    }
+
+    // Генерируем безопасное уникальное имя файла
+    $base_filename = $original_name ?: ('file.' . $ext);
+    $unique_filename = wp_unique_filename($upload_path, $base_filename);
+    $target_file = trailingslashit($upload_path) . $unique_filename;
+
+    if (!@move_uploaded_file($file['tmp_name'], $target_file)) {
+        return new WP_Error(
+            'upload_failed',
+            'Не удалось сохранить файл на сервере',
+            ['status' => 500]
+        );
+    }
+
     // Создаем запись в медиабиблиотеке (автор = 1 - администратор)
     $attachment = [
-        'post_mime_type' => $movefile['type'],
-        'post_title' => sanitize_file_name($file['name']),
+        'post_mime_type' => $file_type,
+        'post_title' => sanitize_file_name($unique_filename),
         'post_content' => '',
         'post_status' => 'inherit',
         'post_author' => 1 // Администратор как автор
     ];
     
-    $attach_id = wp_insert_attachment($attachment, $movefile['file']);
+    $attach_id = wp_insert_attachment($attachment, $target_file);
     // Генерация метаданных нужна в основном для изображений (превью/размеры).
     // На некоторых хостингах генерация метаданных аудио может падать (нет getID3/нет функций),
     // поэтому делаем её безопасно и условно.
@@ -1579,7 +1659,7 @@ function chat_api_upload($request) {
     }
 
     if ($should_generate_metadata && function_exists('wp_generate_attachment_metadata')) {
-        $attach_data = wp_generate_attachment_metadata($attach_id, $movefile['file']);
+        $attach_data = wp_generate_attachment_metadata($attach_id, $target_file);
         if (!is_wp_error($attach_data)) {
             wp_update_attachment_metadata($attach_id, $attach_data);
         }

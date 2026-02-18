@@ -907,7 +907,7 @@ class ApiService {
       
       ApiConfig.logRequest('POST', url.toString(), body: {
         'file': file.path,
-        'filename': fileName,
+        'filename': multipartFile.filename,
         'contentType': contentType,
       });
       
@@ -1039,10 +1039,10 @@ class ApiService {
       
     } catch (e) {
       print('[API] Ошибка отправки: $e');
-      
+      final err = e.toString().replaceFirst('Exception: ', '').trim();
       return Message.createLocal(
         chatId: chatId,
-        text: 'Не удалось отправить файл',
+        text: err.isNotEmpty ? 'Не удалось отправить файл: $err' : 'Не удалось отправить файл',
         senderId: 0,
         type: type,
       );

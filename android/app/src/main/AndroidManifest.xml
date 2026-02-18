@@ -9,6 +9,7 @@
     <!-- Уведомления и вибрация -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
     <!-- Разрешения для скачивания и управления файлами -->
     <!-- Для Android 10-12 -->
