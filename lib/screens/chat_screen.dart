@@ -1123,8 +1123,10 @@ class _ChatScreenState extends State<ChatScreen> {
                                     child: Container(
                                       padding: EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: isMe ? Colors.blue[100] : Colors.grey.shade200,
-                                        borderRadius: BorderRadius.circular(16),
+                                        color: isMe
+                                            ? const Color(0xFF4F8BFF)
+                                            : const Color(0xFF181C25),
+                                        borderRadius: BorderRadius.circular(18),
                                       ),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1269,7 +1271,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.add),
+                  icon: Icon(Icons.add, color: Colors.white70),
                   onPressed: _showAttachmentPickerSheet,
                   tooltip: 'Вложение',
                 ),
@@ -1279,9 +1281,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     controller: _messageController,
                     focusNode: _focusNode,
                     decoration: InputDecoration(
-                      hintText: 'Сообщение...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      hintText: 'Message',
+                      filled: true,
+                      fillColor: const Color(0xFF181C25),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      hintStyle: const TextStyle(color: Colors.white38),
                     ),
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _sendMessage(),
@@ -1298,7 +1307,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       )
                     : IconButton(
-                        icon: Icon(Icons.send),
+                        icon: Icon(Icons.send, color: Color(0xFF4F8BFF)),
                         onPressed: _sendMessage,
                         tooltip: 'Отправить',
                       ),

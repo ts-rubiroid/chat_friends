@@ -335,10 +335,17 @@ class _ChatsScreenState extends State<ChatsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Чаты'),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {},
+        ),
+        title: const Text('Friends'),
 
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: const Color(0xFF4F8BFF),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
           tabs: [
             Tab(
               icon: Stack(

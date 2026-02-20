@@ -29,19 +29,17 @@ class ChatListItem extends StatelessWidget {
     final bool showUnreadIndicator = hasUnread ?? chat.hasUnread;
     
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: chat.isGroup ? Colors.grey[50] : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         onTap: onTap,
         leading: _buildAvatar(otherUser, displayCreator, showUnreadIndicator),
         title: _buildTitle(otherUser, showUnreadIndicator),
         subtitle: _buildSubtitle(otherUser, displayCreator, showUnreadIndicator),
         trailing: _buildTrailing(showUnreadIndicator),
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         minVerticalPadding: 12,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        tileColor: const Color(0xFF181C25),
       ),
     );
   }
@@ -170,9 +168,9 @@ class ChatListItem extends StatelessWidget {
       return Text(
         chat.name.isNotEmpty ? chat.name : 'Групповой чат',
         style: TextStyle(
-          fontWeight: showUnreadIndicator ? FontWeight.bold : FontWeight.normal,
+          fontWeight: showUnreadIndicator ? FontWeight.w600 : FontWeight.w500,
           fontSize: 16,
-          color: showUnreadIndicator ? Colors.black : Colors.grey[800],
+          color: Colors.white,
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
@@ -190,9 +188,9 @@ class ChatListItem extends StatelessWidget {
       return Text(
         title,
         style: TextStyle(
-          fontWeight: showUnreadIndicator ? FontWeight.bold : FontWeight.normal,
+          fontWeight: showUnreadIndicator ? FontWeight.w600 : FontWeight.w500,
           fontSize: 16,
-          color: showUnreadIndicator ? Colors.black : Colors.grey[800],
+          color: Colors.white,
         ),
         overflow: TextOverflow.ellipsis,
         maxLines: 1,
@@ -213,7 +211,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               'Создан: $creatorName',
               style: TextStyle(
-                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.white70 : Colors.white54,
                 fontSize: 11, // Меньший размер для создателя
               ),
               overflow: TextOverflow.ellipsis,
@@ -223,7 +221,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               participantsNames,
               style: TextStyle(
-                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.white70 : Colors.white54,
                 fontSize: 12,
               ),
               overflow: TextOverflow.ellipsis,
@@ -240,7 +238,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               'Создан: $creatorName',
               style: TextStyle(
-                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.white70 : Colors.white54,
                 fontSize: 11,
               ),
               overflow: TextOverflow.ellipsis,
@@ -250,7 +248,7 @@ class ChatListItem extends StatelessWidget {
             Text(
               '${memberCount} участник(ов)',
               style: TextStyle(
-                color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
+                color: showUnreadIndicator ? Colors.white70 : Colors.white54,
                 fontSize: 12,
               ),
               overflow: TextOverflow.ellipsis,
@@ -265,7 +263,7 @@ class ChatListItem extends StatelessWidget {
       return Text(
         messagePreview,
         style: TextStyle(
-          color: showUnreadIndicator ? Colors.black87 : Colors.grey[600],
+          color: showUnreadIndicator ? Colors.white : Colors.white60,
           fontSize: 14,
           fontStyle: messagePreview == 'Нет сообщений' ? FontStyle.italic : FontStyle.normal,
         ),
@@ -285,7 +283,7 @@ class ChatListItem extends StatelessWidget {
             _formatTime(chat.lastMessage!.createdAt!),
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey[500],
+              color: Colors.white54,
             ),
           ),
         SizedBox(height: 4),
@@ -295,7 +293,7 @@ class ChatListItem extends StatelessWidget {
           Container(
             padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.green,
+              color: Color(0xFF4F8BFF),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
