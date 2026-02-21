@@ -25,7 +25,8 @@ class _ChatsScreenState extends State<ChatsScreen>
   User? _currentUser;
   bool _isLoading = true;
   final RefreshController _refreshController = RefreshController();
- 
+  final RefreshController _refreshControllerGroup = RefreshController();
+
   // Для управления вкладками
   late TabController _tabController;
   List<Chat> _personalChats = [];
@@ -67,6 +68,8 @@ class _ChatsScreenState extends State<ChatsScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
+    _refreshController.dispose();
+    _refreshControllerGroup.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -199,6 +202,7 @@ class _ChatsScreenState extends State<ChatsScreen>
   void _onRefresh() async {
     await _loadData();
     _refreshController.refreshCompleted();
+    _refreshControllerGroup.refreshCompleted();
   }
 
   Widget _buildChatsList(List<Chat> chats) {
@@ -455,7 +459,7 @@ class _ChatsScreenState extends State<ChatsScreen>
                 ),
                 // Вкладка групповых чатов
                 SmartRefresher(
-                  controller: RefreshController(),
+                  controller: _refreshControllerGroup,
                   onRefresh: _onRefresh,
                   child: _buildChatsList(_groupChats),
                 ),
