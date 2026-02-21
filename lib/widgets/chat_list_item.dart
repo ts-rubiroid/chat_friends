@@ -39,7 +39,7 @@ class ChatListItem extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         minVerticalPadding: 12,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        tileColor: const Color(0xFF181C25),
+        tileColor: const Color(0xFF222632),
       ),
     );
   }

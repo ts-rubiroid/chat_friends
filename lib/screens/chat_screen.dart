@@ -15,6 +15,7 @@ import 'package:chat_friends/screens/video_viewer_screen.dart';
 import 'package:chat_friends/services/download_service.dart';
 import 'package:chat_friends/services/notification_service.dart';
 import 'package:chat_friends/widgets/audio_player_bubble.dart';
+import 'package:chat_friends/widgets/message_bubble.dart';
 
 
 
@@ -1120,14 +1121,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ],
                                   
                                   Flexible(
-                                    child: Container(
-                                      padding: EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isMe
-                                            ? const Color(0xFF4F8BFF)
-                                            : const Color(0xFF181C25),
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
+                                    child: MessageBubble(
+                                      isFromMe: isMe,
+                                      color: isMe
+                                          ? const Color(0xFF4F8BFF)
+                                          : const Color(0xFF222632),
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
@@ -1248,7 +1246,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                             message.formattedTime,
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.grey.shade600,
+                                              color: isMe
+                                                  ? Colors.white.withOpacity(0.85)
+                                                  : Colors.white54,
                                             ),
                                           ),
                                         ],
@@ -1283,7 +1283,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     decoration: InputDecoration(
                       hintText: 'Message',
                       filled: true,
-                      fillColor: const Color(0xFF181C25),
+                      fillColor: const Color(0xFF222632),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
