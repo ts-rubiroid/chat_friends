@@ -9,6 +9,9 @@
     <!-- Уведомления и вибрация -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- UnifiedPush / ntfy -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
     <!-- Разрешения для скачивания и управления файлами -->
@@ -70,6 +73,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- UnifiedPush: сервис для приёма push (ntfy) -->
+        <service
+            android:name="org.unifiedpush.flutter.connector.MessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.flutter.connector.MessagingService" />
+            </intent-filter>
+        </service>
 
         <!-- FileProvider для обмена файлами -->
         <provider

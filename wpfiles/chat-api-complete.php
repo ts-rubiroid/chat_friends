@@ -742,6 +742,14 @@ function chat_api_send_message($request) {
     if (!empty($params['file_url'])) {
         update_post_meta($message_id, 'file', esc_url_raw($params['file_url']));
     }
+
+    // Хук для push-уведомлений (ntfy): после полного сохранения сообщения
+    do_action('chat_friends_message_sent', $message_id, $chat_id, $user_id, [
+        'text' => $text,
+        'image_url' => $params['image_url'] ?? null,
+        'file_url' => $params['file_url'] ?? null,
+        'created_at' => current_time('Y-m-d H:i:s'),
+    ]);
     
     return [
         'success' => true,
@@ -1509,10 +1517,10 @@ function chat_api_upload($request) {
         return new WP_Error('upload_error', 'Ошибка загрузки файла', ['status' => 400]);
     }
     
-    // Максимум 10MB
-    $max_size = 10 * 1024 * 1024;
+    // Максимум 150MB
+    $max_size = 150 * 1024 * 1024;
     if ($file['size'] > $max_size) {
-        return new WP_Error('file_too_large', 'Файл слишком большой (макс. 10MB)', ['status' => 400]);
+        return new WP_Error('file_too_large', 'Файл слишком большой (макс. 150MB)', ['status' => 400]);
     }
     
     // Некоторые хостинги/окружения определяют MIME для m4a нестабильно:
@@ -1524,8 +1532,8 @@ function chat_api_upload($request) {
     $allowed_exts = [
         // images
         'jpg', 'jpeg', 'png', 'gif',
-        // documents / text
-        'pdf', 'txt',
+        // documents / text / packages
+        'pdf', 'txt', 'apk',
         // video
         'mp4', 'mov', 'webm',
         // audio
@@ -1541,9 +1549,10 @@ function chat_api_upload($request) {
         'image/jpeg',
         'image/png',
         'image/gif',
-        // documents / text
+        // documents / text / packages
         'application/pdf',
         'text/plain',
+        'application/vnd.android.package-archive',
         // video
         'video/mp4',
         'video/quicktime', // mov
@@ -1583,12 +1592,16 @@ function chat_api_upload($request) {
 
     $mime_ok = in_array($effective_mime, $allowed_mimes, true);
     // Если MIME определить не удалось, разрешаем только "безопасные" расширения из allowlist выше.
-    // Для m4a дополнительно допускаем типы, которые часто ошибочно прилетают.
+    // Для m4a/mp4/apk дополнительно допускаем типы, которые часто ошибочно прилетают.
     if (!$mime_ok) {
         if ($ext === 'm4a' && in_array($effective_mime, ['video/mp4', 'application/octet-stream', ''], true)) {
             $mime_ok = true;
         }
         if ($ext === 'mp4' && $effective_mime === 'application/octet-stream') {
+            $mime_ok = true;
+        }
+        // На некоторых хостингах/девайсах APK определяется как application/octet-stream или application/zip.
+        if ($ext === 'apk' && in_array($effective_mime, ['application/octet-stream', 'application/zip', ''], true)) {
             $mime_ok = true;
         }
     }
@@ -1691,7 +1704,18 @@ add_action('init', function() {
     register_meta('user', 'chat_last_seen', [
         'type' => 'array',
         'single' => true,
-        'show_in_rest' => true,
+        'show_in_rest' => [
+            'schema' => [
+                'type'  => 'array',
+                'items' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'chat_id'   => [ 'type' => 'integer' ],
+                        'message_id' => [ 'type' => 'integer' ],
+                    ],
+                ],
+            ],
+        ],
     ]);
 });
 

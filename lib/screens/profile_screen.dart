@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:chat_friends/services/api_service.dart';
+import 'package:chat_friends/services/unifiedpush_service.dart';
 import 'package:chat_friends/screens/login_screen.dart';
 import 'package:chat_friends/models/user.dart';
 
@@ -75,6 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _logout() async {
+    await UnifiedPushService.unregister();
     await ApiService.logout();
     Navigator.pushAndRemoveUntil(
       context,
@@ -186,6 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     if (success) {
+      await UnifiedPushService.unregister();
       await ApiService.logout();
       Navigator.pushAndRemoveUntil(
         context,

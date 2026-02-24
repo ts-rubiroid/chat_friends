@@ -146,6 +146,8 @@ Future<void> _showMinimalNotificationAndBadge(int count) async {
 Future<void> configureAndStartBackgroundFetch() async {
   final status = await BackgroundFetch.configure(
     BackgroundFetchConfig(
+      // Минимально возможный интервал для background_fetch на Android — 15 минут.
+      // Просим 15, фактический интервал будет зависеть от политики энергосбережения ОС.
       minimumFetchInterval: 15,
       stopOnTerminate: false,
       enableHeadless: true,

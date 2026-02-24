@@ -95,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
       
-      final updateUrl = 'https://chatnews.remont-gazon.ru/update/update.json';
+      final updateUrl = 'https://chat.remont-gazon.ru/update/update.json';
       final response = await http.get(Uri.parse(updateUrl));
       
       if (response.statusCode == 200) {

@@ -21,6 +21,8 @@ class NotificationService {
 
   /// Флаг: приложение запущено по тапу на уведомление (чтобы показать список чатов).
   static bool pendingOpenChatsList = false;
+  /// ID чата для открытия по тапу на уведомление (из payload).
+  static int? pendingChatId;
 
   static const String _channelId = 'chat_friends_messages';
   static const String _channelName = 'Новые сообщения';
@@ -54,6 +56,7 @@ class NotificationService {
     if (launchDetails?.didNotificationLaunchApp == true &&
         launchDetails?.notificationResponse != null) {
       pendingOpenChatsList = true;
+      _setPendingChatIdFromPayload(launchDetails!.notificationResponse!.payload);
     }
 
     _initialized = true;
@@ -88,7 +91,17 @@ class NotificationService {
   }
 
   static void _onNotificationTapped(NotificationResponse response) {
+    _setPendingChatIdFromPayload(response.payload);
     _openChatsList();
+  }
+
+  static void _setPendingChatIdFromPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final map = json.decode(payload) as Map<String, dynamic>?;
+      final id = map?['chatId'];
+      if (id != null) pendingChatId = id is int ? id : int.tryParse(id.toString());
+    } catch (_) {}
   }
 
   /// Переход на экран общего списка чатов.
@@ -99,6 +112,45 @@ class NotificationService {
       return;
     }
     key!.currentState!.popUntil((route) => route.isFirst);
+  }
+
+  /// Показать уведомление из push (UnifiedPush/ntfy). Не показывает, если пользователь уже в этом чате.
+  static Future<void> showPushNotification({
+    required int chatId,
+    required String title,
+    required String body,
+    int? messageId,
+    int? senderId,
+  }) async {
+    if (chatId == currentChatId) return;
+    final payload = json.encode({'chatId': chatId});
+    const androidDetails = AndroidNotificationDetails(
+      _channelId,
+      _channelName,
+      channelDescription: 'Уведомления о новых сообщениях в чате',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    final id = chatId.hashCode.abs() % 100000;
+    await _plugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
+    );
+    await soundAndVibrate();
   }
 
   /// Показать уведомление о новом сообщении и вызвать звук/вибрацию.

@@ -4,13 +4,19 @@ import 'package:chat_friends/screens/chats_screen.dart';
 import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/services/notification_service.dart';
 import 'package:chat_friends/services/background_fetch_service.dart';
+import 'package:chat_friends/services/unifiedpush_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   initBackgroundFetch();
   await NotificationService.init(navigatorKey);
+  await UnifiedPushService.init(args);
+  // При фоновом запуске по push не показываем UI
+  if (args.contains('--unifiedpush-bg')) {
+    return;
+  }
   runApp(MyApp());
 }
 
@@ -75,7 +81,8 @@ class MyApp extends StatelessWidget {
           child: child!,
         );
       },
-      home: FutureBuilder(
+      home: _AppLifecycleWrapper(
+        child: FutureBuilder(
         future: ApiService.getToken(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -90,8 +97,42 @@ class MyApp extends StatelessWidget {
           }
         },
       ),
+      ),
       debugShowCheckedModeBanner: false,
     );
   }
+}
+
+/// Отслеживает lifecycle приложения для UnifiedPush (не показывать уведомление в фореграунде).
+class _AppLifecycleWrapper extends StatefulWidget {
+  const _AppLifecycleWrapper({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AppLifecycleWrapper> createState() => _AppLifecycleWrapperState();
+}
+
+class _AppLifecycleWrapperState extends State<_AppLifecycleWrapper>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    UnifiedPushService.appInForeground = state == AppLifecycleState.resumed;
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 

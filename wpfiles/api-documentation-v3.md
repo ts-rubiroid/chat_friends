@@ -659,9 +659,9 @@ Endpoint: POST /chat-api/v1/upload
 
 ✅ Поле: file
 
-✅ Максимальный размер: 10MB
+✅ Максимальный размер: 150MB
 
-✅ Разрешенные типы: image/jpeg, image/png, image/gif, application/pdf, text/plain
+✅ Разрешенные типы: image/jpeg, image/png, image/gif, application/pdf, text/plain, application/vnd.android.package-archive
 
 Пример Flutter:
 

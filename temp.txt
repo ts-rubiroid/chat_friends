@@ -7,6 +7,9 @@ flutter pub get
 flutter build apk --release
 
 
+Я не могу использовать Firebase. Я живу в России, а тут много ограничений. Может есть какие то доступные в России аналоги FB? С триалами или не большой платой. 
+
+
 git reset --hard 50a84bff47fae6e3d4d380a6b0232f07cfb322b5
 git reset --hard d474729166af73c2d9e85c86950d31b5f33d4118
 ################### git reset --hard 0fd9f9bde1104e5c2bd1812613deffb7b69f8462
@@ -130,12 +133,15 @@ localhost
 
 
 
+chatnews.remont-gazon.ru
 
+Что нужно	У вас есть
+IP сервера	155.212.191.117
+Логин	root
+Пароль XGcP(2usXw*4
+Подключение	root@155.212.191.117
 
-
-
-ss
-
+XGcP(2usXw*4
 
 #############################################################
 

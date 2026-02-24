@@ -1,5 +1,13 @@
 <?php
-// Дочерняя тема для Chat Friends
+/**
+ * Дочерняя тема для Chat Friends
+ * Отключаем вывод PHP-уведомлений в браузер (WP 6.7 + ACF загружают перевод до init),
+ * иначе «headers already sent» и белый экран админки. Лог по-прежнему в debug.log.
+ */
+if (function_exists('ini_set')) {
+    @ini_set('display_errors', '0');
+}
+
 add_action('after_setup_theme', function() {
     // Загружаем текстовый домен для перевода
     load_theme_textdomain('chat-friends', get_stylesheet_directory() . '/languages');
@@ -18,6 +26,9 @@ require_once get_stylesheet_directory() . '/chat-auth.php';
 
 // 3. Подключаем ПОЛНЫЙ API (все endpoints в одном файле)
 require_once get_stylesheet_directory() . '/chat-api-complete.php';
+
+// 4. Push-уведомления через ntfy (UnifiedPush)
+require_once get_stylesheet_directory() . '/chat-push-ntfy.php';
 
 
 

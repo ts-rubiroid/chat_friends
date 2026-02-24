@@ -1,0 +1,9 @@
+# Публичный URL (HTTPS), под которым пользователи заходят на ntfy
+# Замените push.remont-gazon.ru на ваш поддомен
+base-url: "https://push.remont-gazon.ru"
+# Слушаем только локально — снаружи будет заходить nginx
+listen-http: "127.0.0.1:2586"
+# Мы за reverse proxy — нужна корректная работа лимитов по IP
+behind-proxy: true
+# Кэш сообщений (чтобы перезапуск не терял недавние сообщения)
+cache-file: "/var/lib/ntfy/cache.db"

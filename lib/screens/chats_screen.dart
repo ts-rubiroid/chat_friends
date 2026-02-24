@@ -6,6 +6,7 @@ import 'package:chat_friends/services/api_service.dart';
 import 'package:chat_friends/services/notification_service.dart';
 import 'package:chat_friends/services/background_notification_task.dart';
 import 'package:chat_friends/services/background_fetch_service.dart';
+import 'package:chat_friends/services/unifiedpush_service.dart';
 import 'package:chat_friends/models/chat.dart';
 import 'package:chat_friends/models/user.dart';
 import 'package:chat_friends/widgets/chat_list_item.dart';
@@ -58,14 +59,35 @@ class _ChatsScreenState extends State<ChatsScreen>
     }
   }
 
-  /// Если приложение открыто по тапу на уведомление — просто сбрасываем флаг (экран списка чатов уже показан).
+  /// Если приложение открыто по тапу на уведомление — сбрасываем флаг и при наличии pendingChatId открываем чат.
   void _checkPendingNotificationChat() {
     if (!NotificationService.pendingOpenChatsList || !mounted) return;
     NotificationService.pendingOpenChatsList = false;
+    _navigateToPendingChatIfNeeded();
+  }
+
+  /// Открыть чат из payload уведомления (после загрузки списка). Вызывать из _checkPendingNotificationChat и после _loadData.
+  void _navigateToPendingChatIfNeeded() {
+    final chatId = NotificationService.pendingChatId;
+    if (chatId == null || !mounted) return;
+    Chat? chat;
+    for (final c in _chats) {
+      if (c.id == chatId) {
+        chat = c;
+        break;
+      }
+    }
+    if (chat == null || !mounted) return;
+    NotificationService.pendingChatId = null;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ChatScreen(chat: chat!)),
+    );
   }
 
   @override
   void dispose() {
+    UnifiedPushService.onForegroundMessage = null;
     WidgetsBinding.instance.removeObserver(this);
     _notificationTimer?.cancel();
     _refreshController.dispose();
@@ -187,12 +209,18 @@ class _ChatsScreenState extends State<ChatsScreen>
         }
         persistNotificationState(_lastKnownLastMessageId, _currentUser?.id);
         await configureAndStartBackgroundFetch();
+        // Подписка на push (ntfy) для мгновенных уведомлений
+        if (_currentUser != null) {
+          UnifiedPushService.registerTopic(_currentUser!.id);
+        }
+        UnifiedPushService.onForegroundMessage = _checkNewMessages;
         print('[Notify] Таймер опроса уведомлений запущен (каждые 5 сек), чатов: ${_chats.length}, известных lastId: ${_lastKnownLastMessageId.length}');
         _notificationTimer?.cancel();
         _notificationTimer = Timer.periodic(
           const Duration(seconds: 5),
           (_) => _checkNewMessages(),
         );
+        _navigateToPendingChatIfNeeded();
       }
     } catch (e) {
       print('Ошибка загрузки данных: $e');

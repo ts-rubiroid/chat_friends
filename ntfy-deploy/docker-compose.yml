@@ -1,0 +1,20 @@
+# Копировать на VPS в /opt/ntfy/ и запускать: sudo docker compose up -d
+# server.yml должен лежать рядом (см. server.yml в этой папке).
+# Порты 2586:2586 — т.к. в server.yml указано listen-http: "127.0.0.1:2586"
+
+services:
+  ntfy:
+    image: binwiederhier/ntfy
+    container_name: ntfy
+    restart: unless-stopped
+    command: serve
+    volumes:
+      - ./server.yml:/etc/ntfy/server.yml:ro
+      - ntfy_data:/var/lib/ntfy
+    ports:
+      - "127.0.0.1:2586:2586"
+    environment:
+      TZ: Europe/Moscow
+
+volumes:
+  ntfy_data:
